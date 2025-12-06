@@ -9,12 +9,13 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.platypus import (
     SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, 
-    PageBreak, Image, HRFlowable
+    PageBreak, Image, HRFlowable, PageTemplate, BaseDocTemplate
 )
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 from datetime import datetime
 from typing import Dict, List, Any
 import io
+import pytz
 
 
 class PDFReportGenerator:
@@ -25,55 +26,127 @@ class PDFReportGenerator:
         self._setup_custom_styles()
     
     def _setup_custom_styles(self):
-        """Setup custom paragraph styles - safely add only if they don't exist"""
+        """Setup custom paragraph styles matching dashboard design"""
+        # Dashboard color scheme
+        self.colors = {
+            'primary': colors.HexColor('#3b82f6'),  # rgb(59, 130, 246)
+            'foreground': colors.HexColor('#333333'),  # rgb(51, 51, 51)
+            'background': colors.HexColor('#ffffff'),  # rgb(255, 255, 255)
+            'muted': colors.HexColor('#f9fafb'),  # rgb(249, 250, 251)
+            'muted_foreground': colors.HexColor('#6b7280'),  # rgb(107, 114, 128)
+            'border': colors.HexColor('#e5e7eb'),  # rgb(229, 231, 235)
+            'destructive': colors.HexColor('#ef4444'),  # rgb(239, 68, 68)
+            'success': colors.HexColor('#22c55e'),  # #22c55e
+            'card': colors.HexColor('#ffffff'),
+        }
+        
         # Helper function to safely add a style
         def safe_add_style(style_name, style_params):
             try:
-                # Check if style already exists
                 _ = self.styles[style_name]
-                # If we get here, style exists - skip adding
             except KeyError:
-                # Style doesn't exist, add it
                 try:
                     self.styles.add(ParagraphStyle(name=style_name, **style_params))
                 except Exception:
-                    # If add fails (e.g., style was added between check and add), that's okay
                     pass
         
+        # Modern title style matching dashboard
         safe_add_style('CustomTitle', {
             'parent': self.styles['Title'],
-            'fontSize': 24,
-            'spaceAfter': 30,
-            'textColor': colors.HexColor('#1a1a2e')
+            'fontName': 'Helvetica-Bold',
+            'fontSize': 28,
+            'spaceAfter': 12,
+            'textColor': self.colors['foreground'],
+            'alignment': TA_LEFT,
+            'leading': 34
         })
         
+        # Section headers matching dashboard
         safe_add_style('SectionHeader', {
             'parent': self.styles['Heading2'],
-            'fontSize': 14,
-            'spaceBefore': 20,
-            'spaceAfter': 10,
-            'textColor': colors.HexColor('#4a90d9')
+            'fontName': 'Helvetica-Bold',
+            'fontSize': 16,
+            'spaceBefore': 24,
+            'spaceAfter': 12,
+            'textColor': self.colors['primary'],
+            'alignment': TA_LEFT,
+            'leading': 20
         })
         
         safe_add_style('SubHeader', {
             'parent': self.styles['Heading3'],
-            'fontSize': 12,
-            'spaceBefore': 15,
-            'spaceAfter': 8
+            'fontName': 'Helvetica-Bold',
+            'fontSize': 13,
+            'spaceBefore': 18,
+            'spaceAfter': 10,
+            'textColor': self.colors['foreground'],
+            'leading': 16
         })
         
+        # Body text matching dashboard
         safe_add_style('BodyText', {
             'parent': self.styles['Normal'],
-            'fontSize': 10,
-            'spaceAfter': 8,
-            'leading': 14
+            'fontName': 'Helvetica',
+            'fontSize': 11,
+            'spaceAfter': 10,
+            'leading': 16,
+            'textColor': self.colors['foreground']
         })
         
+        # Small text for metadata
         safe_add_style('SmallText', {
             'parent': self.styles['Normal'],
-            'fontSize': 8,
-            'textColor': colors.grey
+            'fontName': 'Helvetica',
+            'fontSize': 9,
+            'textColor': self.colors['muted_foreground'],
+            'leading': 13
         })
+        
+        # Footer style
+        safe_add_style('FooterText', {
+            'parent': self.styles['Normal'],
+            'fontName': 'Helvetica',
+            'fontSize': 9,
+            'textColor': self.colors['muted_foreground'],
+            'alignment': TA_CENTER,
+            'leading': 13
+        })
+    
+    def _get_gmt7_datetime(self):
+        """Get current datetime in GMT+7 timezone"""
+        gmt7 = pytz.timezone('Asia/Bangkok')
+        return datetime.now(gmt7)
+    
+    def _format_datetime_gmt7(self, dt=None):
+        """Format datetime in GMT+7 with readable format"""
+        if dt is None:
+            dt = self._get_gmt7_datetime()
+        elif isinstance(dt, str):
+            try:
+                if 'T' in dt:
+                    dt = datetime.fromisoformat(dt.replace('Z', '+00:00'))
+                    # Convert to GMT+7
+                    gmt7 = pytz.timezone('Asia/Bangkok')
+                    if dt.tzinfo is None:
+                        dt = pytz.utc.localize(dt)
+                    dt = dt.astimezone(gmt7)
+                else:
+                    dt = datetime.strptime(dt, '%Y-%m-%d %H:%M:%S')
+                    gmt7 = pytz.timezone('Asia/Bangkok')
+                    dt = gmt7.localize(dt)
+            except (ValueError, AttributeError):
+                dt = self._get_gmt7_datetime()
+        else:
+            # If datetime object, convert to GMT+7
+            gmt7 = pytz.timezone('Asia/Bangkok')
+            if dt.tzinfo is None:
+                dt = pytz.utc.localize(dt)
+            dt = dt.astimezone(gmt7)
+        
+        # Format: "January 15, 2024 at 14:30:45 GMT+7"
+        date_str = dt.strftime('%B %d, %Y')
+        time_str = dt.strftime('%H:%M:%S')
+        return f"{date_str} at {time_str} GMT+7"
     
     def generate_model_report(
         self,
@@ -104,38 +177,26 @@ class PDFReportGenerator:
         
         story = []
         
-        # Title
+        # Title with modern styling
         story.append(Paragraph(f"📊 {model_name}", self.styles['CustomTitle']))
         story.append(Paragraph(
             f"Signal Report • {category} Model",
             self.styles['BodyText']
         ))
+        story.append(Spacer(1, 8))
         
-        # Metadata
-        if run_timestamp:
-            # Parse ISO format timestamp and format it nicely
-            try:
-                if 'T' in run_timestamp:
-                    dt = datetime.fromisoformat(run_timestamp.replace('Z', '+00:00'))
-                    timestamp = dt.strftime("%Y-%m-%d %H:%M:%S")
-                else:
-                    timestamp = run_timestamp
-            except (ValueError, AttributeError):
-                timestamp = run_timestamp
-        else:
-            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        
+        # Metadata with improved styling
+        generated_time = self._format_datetime_gmt7(run_timestamp) if run_timestamp else self._format_datetime_gmt7()
         meta_text = f"""
-        <b>Generated:</b> {timestamp}<br/>
         <b>Universe:</b> {universe.upper()}<br/>
         <b>Stocks Analyzed:</b> {stocks_with_data} / {total_analyzed}
         """
         story.append(Paragraph(meta_text, self.styles['SmallText']))
         story.append(Spacer(1, 20))
         
-        # Horizontal line
-        story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor('#e0e0e0')))
-        story.append(Spacer(1, 15))
+        # Horizontal line with dashboard border color
+        story.append(HRFlowable(width="100%", thickness=1, color=self.colors['border']))
+        story.append(Spacer(1, 20))
         
         # Model Description
         if description:
@@ -143,19 +204,25 @@ class PDFReportGenerator:
             story.append(Paragraph(description, self.styles['BodyText']))
             story.append(Spacer(1, 10))
         
-        # Parameters
+        # Parameters with improved styling
         if parameters:
             story.append(Paragraph("Parameters", self.styles['SubHeader']))
             param_data = [[k, str(v)] for k, v in parameters.items()]
             param_table = Table(param_data, colWidths=[2*inch, 3*inch])
             param_table.setStyle(TableStyle([
-                ('FONTSIZE', (0, 0), (-1, -1), 9),
-                ('TEXTCOLOR', (0, 0), (0, -1), colors.grey),
+                ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 0), (-1, -1), 10),
+                ('TEXTCOLOR', (0, 0), (0, -1), self.colors['muted_foreground']),
+                ('TEXTCOLOR', (1, 0), (1, -1), self.colors['foreground']),
                 ('ALIGN', (0, 0), (0, -1), 'RIGHT'),
+                ('ALIGN', (1, 0), (1, -1), 'LEFT'),
                 ('RIGHTPADDING', (0, 0), (0, -1), 15),
+                ('LEFTPADDING', (1, 0), (1, -1), 10),
+                ('TOPPADDING', (0, 0), (-1, -1), 6),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
             ]))
             story.append(param_table)
-            story.append(Spacer(1, 15))
+            story.append(Spacer(1, 20))
         
         # Summary Stats
         story.append(Paragraph("Summary", self.styles['SectionHeader']))
@@ -168,15 +235,16 @@ class PDFReportGenerator:
         ]
         summary_table = Table(summary_data, colWidths=[2.5*inch, 2*inch])
         summary_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#4a90d9')),
+            ('BACKGROUND', (0, 0), (-1, 0), self.colors['primary']),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
             ('FONTSIZE', (0, 0), (-1, -1), 10),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e0e0e0')),
-            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f8f9fa')]),
-            ('TOPPADDING', (0, 0), (-1, -1), 8),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+            ('GRID', (0, 0), (-1, -1), 0.5, self.colors['border']),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [self.colors['background'], self.colors['muted']]),
+            ('TEXTCOLOR', (0, 1), (-1, -1), self.colors['foreground']),
+            ('TOPPADDING', (0, 0), (-1, -1), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
         ]))
         story.append(summary_table)
         story.append(Spacer(1, 20))
@@ -195,16 +263,17 @@ class PDFReportGenerator:
             
             buy_table = Table(buy_data, colWidths=[0.7*inch, 1.5*inch, 1*inch, 1.2*inch])
             buy_table.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#28a745')),
+                ('BACKGROUND', (0, 0), (-1, 0), self.colors['success']),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
                 ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
                 ('FONTSIZE', (0, 0), (-1, -1), 10),
                 ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
                 ('ALIGN', (1, 1), (1, -1), 'LEFT'),
-                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e0e0e0')),
-                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f0fff4')]),
-                ('TOPPADDING', (0, 0), (-1, -1), 6),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+                ('GRID', (0, 0), (-1, -1), 0.5, self.colors['border']),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [self.colors['background'], colors.HexColor('#f0fdf4')]),
+                ('TEXTCOLOR', (0, 1), (-1, -1), self.colors['foreground']),
+                ('TOPPADDING', (0, 0), (-1, -1), 8),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
             ]))
             story.append(buy_table)
             story.append(Spacer(1, 20))
@@ -223,27 +292,29 @@ class PDFReportGenerator:
             
             sell_table = Table(sell_data, colWidths=[0.7*inch, 1.5*inch, 1*inch, 1.2*inch])
             sell_table.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#dc3545')),
+                ('BACKGROUND', (0, 0), (-1, 0), self.colors['destructive']),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
                 ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
                 ('FONTSIZE', (0, 0), (-1, -1), 10),
                 ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
                 ('ALIGN', (1, 1), (1, -1), 'LEFT'),
-                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e0e0e0')),
-                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#fff5f5')]),
-                ('TOPPADDING', (0, 0), (-1, -1), 6),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+                ('GRID', (0, 0), (-1, -1), 0.5, self.colors['border']),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [self.colors['background'], colors.HexColor('#fef2f2')]),
+                ('TEXTCOLOR', (0, 1), (-1, -1), self.colors['foreground']),
+                ('TOPPADDING', (0, 0), (-1, -1), 8),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
             ]))
             story.append(sell_table)
         
-        # Footer
-        story.append(Spacer(1, 30))
-        story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor('#e0e0e0')))
-        story.append(Spacer(1, 10))
-        story.append(Paragraph(
-            "Generated by Quant Stock Analysis Platform • For institutional use only",
-            self.styles['SmallText']
-        ))
+        # Footer with website name, date, and time
+        story.append(Spacer(1, 40))
+        story.append(HRFlowable(width="100%", thickness=1, color=self.colors['border']))
+        story.append(Spacer(1, 12))
+        footer_text = f"""
+        <b>📈 Quant Stock Analysis v2</b><br/>
+        Generated on {generated_time}
+        """
+        story.append(Paragraph(footer_text, self.styles['FooterText']))
         
         # Build PDF
         doc.build(story)
@@ -294,9 +365,9 @@ class PDFReportGenerator:
         story.append(Paragraph(meta_text, self.styles['SmallText']))
         story.append(Spacer(1, 20))
         
-        # Horizontal line
-        story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor('#e0e0e0')))
-        story.append(Spacer(1, 15))
+        # Horizontal line with dashboard border color
+        story.append(HRFlowable(width="100%", thickness=1, color=self.colors['border']))
+        story.append(Spacer(1, 20))
         
         # Performance Summary
         story.append(Paragraph("Performance Summary", self.styles['SectionHeader']))
@@ -311,15 +382,16 @@ class PDFReportGenerator:
         ]
         perf_table = Table(perf_data, colWidths=[2.5*inch, 2*inch])
         perf_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#4a90d9')),
+            ('BACKGROUND', (0, 0), (-1, 0), self.colors['primary']),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
             ('FONTSIZE', (0, 0), (-1, -1), 10),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e0e0e0')),
-            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f8f9fa')]),
-            ('TOPPADDING', (0, 0), (-1, -1), 8),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+            ('GRID', (0, 0), (-1, -1), 0.5, self.colors['border']),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [self.colors['background'], self.colors['muted']]),
+            ('TEXTCOLOR', (0, 1), (-1, -1), self.colors['foreground']),
+            ('TOPPADDING', (0, 0), (-1, -1), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
         ]))
         story.append(perf_table)
         story.append(Spacer(1, 20))
@@ -338,15 +410,16 @@ class PDFReportGenerator:
         ]
         trade_table = Table(trade_data, colWidths=[2.5*inch, 2*inch])
         trade_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#28a745')),
+            ('BACKGROUND', (0, 0), (-1, 0), self.colors['success']),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
             ('FONTSIZE', (0, 0), (-1, -1), 10),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e0e0e0')),
-            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f0fff4')]),
-            ('TOPPADDING', (0, 0), (-1, -1), 8),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+            ('GRID', (0, 0), (-1, -1), 0.5, self.colors['border']),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [self.colors['background'], colors.HexColor('#f0fdf4')]),
+            ('TEXTCOLOR', (0, 1), (-1, -1), self.colors['foreground']),
+            ('TOPPADDING', (0, 0), (-1, -1), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
         ]))
         story.append(trade_table)
         story.append(Spacer(1, 20))
@@ -375,27 +448,30 @@ class PDFReportGenerator:
             # Adjust column widths for 7 columns instead of 6
             trades_table = Table(trades_data, colWidths=[0.9*inch, 0.9*inch, 0.7*inch, 0.7*inch, 0.7*inch, 0.7*inch, 0.7*inch])
             trades_table.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#dc3545')),
+                ('BACKGROUND', (0, 0), (-1, 0), self.colors['destructive']),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
                 ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
                 ('FONTSIZE', (0, 0), (-1, -1), 8),
                 ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e0e0e0')),
-                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f8f9fa')]),
-                ('TOPPADDING', (0, 0), (-1, -1), 4),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+                ('GRID', (0, 0), (-1, -1), 0.5, self.colors['border']),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [self.colors['background'], self.colors['muted']]),
+                ('TEXTCOLOR', (0, 1), (-1, -1), self.colors['foreground']),
+                ('TOPPADDING', (0, 0), (-1, -1), 6),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
             ]))
             story.append(trades_table)
             story.append(Spacer(1, 20))
         
-        # Footer
-        story.append(Spacer(1, 30))
-        story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor('#e0e0e0')))
-        story.append(Spacer(1, 10))
-        story.append(Paragraph(
-            "Generated by Quant Stock Analysis Platform • Backtest results are indicative only",
-            self.styles['SmallText']
-        ))
+        # Footer with website name, date, and time
+        generated_time = self._format_datetime_gmt7()
+        story.append(Spacer(1, 40))
+        story.append(HRFlowable(width="100%", thickness=1, color=self.colors['border']))
+        story.append(Spacer(1, 12))
+        footer_text = f"""
+        <b>📈 Quant Stock Analysis v2</b><br/>
+        Generated on {generated_time}
+        """
+        story.append(Paragraph(footer_text, self.styles['FooterText']))
         
         # Build PDF
         doc.build(story)
@@ -531,14 +607,16 @@ class PDFReportGenerator:
             ]))
             story.append(sell_table)
         
-        # Footer
-        story.append(Spacer(1, 30))
-        story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor('#e0e0e0')))
-        story.append(Spacer(1, 10))
-        story.append(Paragraph(
-            "Generated by Quant Stock Analysis Platform • Multi-model consensus signals",
-            self.styles['SmallText']
-        ))
+        # Footer with website name, date, and time
+        generated_time = self._format_datetime_gmt7(timestamp)
+        story.append(Spacer(1, 40))
+        story.append(HRFlowable(width="100%", thickness=1, color=self.colors['border']))
+        story.append(Spacer(1, 12))
+        footer_text = f"""
+        <b>📈 Quant Stock Analysis v2</b><br/>
+        Generated on {generated_time}
+        """
+        story.append(Paragraph(footer_text, self.styles['FooterText']))
         
         doc.build(story)
         buffer.seek(0)
@@ -621,14 +699,16 @@ class PDFReportGenerator:
         ]))
         story.append(sector_table)
         
-        # Footer
-        story.append(Spacer(1, 30))
-        story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor('#e0e0e0')))
-        story.append(Spacer(1, 10))
-        story.append(Paragraph(
-            "Generated by Quant Stock Analysis Platform • Sector rotation analysis",
-            self.styles['SmallText']
-        ))
+        # Footer with website name, date, and time
+        generated_time = self._format_datetime_gmt7(timestamp)
+        story.append(Spacer(1, 40))
+        story.append(HRFlowable(width="100%", thickness=1, color=self.colors['border']))
+        story.append(Spacer(1, 12))
+        footer_text = f"""
+        <b>📈 Quant Stock Analysis v2</b><br/>
+        Generated on {generated_time}
+        """
+        story.append(Paragraph(footer_text, self.styles['FooterText']))
         
         doc.build(story)
         buffer.seek(0)
@@ -758,14 +838,16 @@ class PDFReportGenerator:
             ]))
             story.append(signals_table)
         
-        # Footer
-        story.append(Spacer(1, 30))
-        story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor('#e0e0e0')))
-        story.append(Spacer(1, 10))
-        story.append(Paragraph(
-            "Generated by Quant Stock Analysis Platform • Market regime analysis",
-            self.styles['SmallText']
-        ))
+        # Footer with website name, date, and time
+        generated_time = self._format_datetime_gmt7(timestamp)
+        story.append(Spacer(1, 40))
+        story.append(HRFlowable(width="100%", thickness=1, color=self.colors['border']))
+        story.append(Spacer(1, 12))
+        footer_text = f"""
+        <b>📈 Quant Stock Analysis v2</b><br/>
+        Generated on {generated_time}
+        """
+        story.append(Paragraph(footer_text, self.styles['FooterText']))
         
         doc.build(story)
         buffer.seek(0)

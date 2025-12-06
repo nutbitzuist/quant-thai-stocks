@@ -19,6 +19,7 @@ numpy>=1.26.0
 
 # PDF Generation
 reportlab>=4.0.0
+pytz>=2024.1
 
 # HTTP Client
 httpx>=0.26.0
