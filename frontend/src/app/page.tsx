@@ -43,6 +43,12 @@ interface BacktestResult {
   }>;
 }
 
+// Helper function to remove markdown formatting
+const cleanMarkdown = (text: string): string => {
+  if (!text) return text;
+  return text.replace(/\*\*/g, '').trim();
+};
+
 const S = {
   card: { 
     background: 'var(--card)', 
@@ -1425,14 +1431,14 @@ export default function Home() {
                             {doc.summary && (
                               <div style={{ marginBottom: '1rem' }}>
                                 <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.875rem', fontWeight: '600', color: 'var(--foreground)' }}>Summary</h4>
-                                <p style={{ color: 'var(--muted-foreground)', margin: 0, lineHeight: '1.6' }}>{doc.summary}</p>
+                                <p style={{ color: 'var(--muted-foreground)', margin: 0, lineHeight: '1.6' }}>{cleanMarkdown(doc.summary)}</p>
                               </div>
                             )}
 
                             {doc.description && (
                               <div style={{ marginBottom: '1rem' }}>
                                 <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.875rem', fontWeight: '600', color: 'var(--foreground)' }}>Description</h4>
-                                <p style={{ color: 'var(--muted-foreground)', margin: 0, lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>{doc.description}</p>
+                                <p style={{ color: 'var(--muted-foreground)', margin: 0, lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>{cleanMarkdown(doc.description)}</p>
                               </div>
                             )}
 
@@ -1449,7 +1455,7 @@ export default function Home() {
                                         )}
                                       </div>
                                       {param.description && (
-                                        <p style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)', margin: 0 }}>{param.description}</p>
+                                        <p style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)', margin: 0 }}>{cleanMarkdown(String(param.description))}</p>
                                       )}
                                     </div>
                                   ))}
@@ -1464,13 +1470,13 @@ export default function Home() {
                                   {doc.signals.buy && (
                                     <div style={{ background: 'rgba(34, 197, 94, 0.1)', border: '1px solid #22c55e', borderRadius: 'var(--radius)', padding: '0.75rem' }}>
                                       <div style={{ fontSize: '0.75rem', fontWeight: '600', color: '#22c55e', marginBottom: '0.25rem' }}>🟢 Buy Signal</div>
-                                      <p style={{ fontSize: '0.75rem', color: 'var(--foreground)', margin: 0 }}>{doc.signals.buy}</p>
+                                      <p style={{ fontSize: '0.75rem', color: 'var(--foreground)', margin: 0 }}>{cleanMarkdown(doc.signals.buy)}</p>
                                     </div>
                                   )}
                                   {doc.signals.sell && (
                                     <div style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid var(--destructive)', borderRadius: 'var(--radius)', padding: '0.75rem' }}>
                                       <div style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--destructive)', marginBottom: '0.25rem' }}>🔴 Sell Signal</div>
-                                      <p style={{ fontSize: '0.75rem', color: 'var(--foreground)', margin: 0 }}>{doc.signals.sell}</p>
+                                      <p style={{ fontSize: '0.75rem', color: 'var(--foreground)', margin: 0 }}>{cleanMarkdown(doc.signals.sell)}</p>
                                     </div>
                                   )}
                                 </div>
