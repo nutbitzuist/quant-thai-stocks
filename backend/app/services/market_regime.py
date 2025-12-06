@@ -268,15 +268,24 @@ class MarketRegimeDetector:
     
     def to_dict(self, regime: MarketRegime) -> Dict:
         """Convert MarketRegime to dictionary"""
-        # Filter out None values from signals for JSON serialization
-        signals_clean = {k: v for k, v in regime.signals.items() if v is not None}
+        # Filter out None values and convert numpy.bool to Python bool
+        signals_clean = {}
+        for k, v in regime.signals.items():
+            if v is not None:
+                # Convert numpy.bool_ to Python bool
+                if isinstance(v, (np.bool_, np.generic)):
+                    signals_clean[k] = bool(v)
+                else:
+                    signals_clean[k] = v
         
         # Ensure all metrics values are JSON-serializable (convert numpy types)
         metrics_clean = {}
         for k, v in regime.metrics.items():
             if isinstance(v, (np.integer, np.floating)):
                 metrics_clean[k] = float(v) if isinstance(v, np.floating) else int(v)
-            elif isinstance(v, (int, float, str)):
+            elif isinstance(v, np.bool_):
+                metrics_clean[k] = bool(v)
+            elif isinstance(v, (int, float, str, bool)):
                 metrics_clean[k] = v
             else:
                 metrics_clean[k] = str(v)
