@@ -32,7 +32,7 @@ from app.models.technical.keltner_channel import KeltnerChannelModel
 from app.models.technical.volume_profile import VolumeProfileModel
 from app.models.technical.dual_ema import DualEMAModel
 
-# Import all models - FUNDAMENTAL (9)
+# Import all models - FUNDAMENTAL (12)
 from app.models.fundamental.canslim import CANSLIMModel
 from app.models.fundamental.value_composite import ValueCompositeModel
 from app.models.fundamental.quality_score import QualityScoreModel
@@ -42,6 +42,9 @@ from app.models.fundamental.dividend_aristocrats import DividendAristocratsModel
 from app.models.fundamental.earnings_momentum import EarningsMomentumModel
 from app.models.fundamental.garp import GARPModel
 from app.models.fundamental.altman_z import AltmanZScoreModel
+from app.models.fundamental.ev_ebitda import EVEBITDAModel
+from app.models.fundamental.fcf_yield import FCFYieldModel
+from app.models.fundamental.momentum_value import MomentumValueModel
 
 # Import all models - QUANTITATIVE (4)
 from app.models.quantitative.mean_reversion import MeanReversionModel
@@ -68,7 +71,7 @@ TECHNICAL_MODELS = {
     "dual_ema": DualEMAModel,
 }
 
-# Model registry - 9 Fundamental Models
+# Model registry - 12 Fundamental Models
 FUNDAMENTAL_MODELS = {
     "canslim": CANSLIMModel,
     "value_composite": ValueCompositeModel,
@@ -79,6 +82,9 @@ FUNDAMENTAL_MODELS = {
     "earnings_momentum": EarningsMomentumModel,
     "garp": GARPModel,
     "altman_z": AltmanZScoreModel,
+    "ev_ebitda": EVEBITDAModel,
+    "fcf_yield": FCFYieldModel,
+    "momentum_value": MomentumValueModel,
 }
 
 # Model registry - 4 Quantitative/Statistical Models

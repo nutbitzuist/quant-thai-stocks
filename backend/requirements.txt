@@ -29,4 +29,12 @@ aiohttp>=3.9.0
 python-dotenv>=1.0.0
 python-multipart>=0.0.6
 
+# Backtesting & Performance Analysis
+vectorbt>=0.26.0  # High-performance backtesting
+quantstats>=0.0.62  # Performance reports and tearsheets
+
+# Visualization (for generating charts)
+plotly>=5.18.0
+kaleido>=0.2.1  # For static image export from Plotly
+
 # Note: Run with Python 3.10+ for best compatibility

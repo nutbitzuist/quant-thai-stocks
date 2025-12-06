@@ -801,6 +801,140 @@ The model identifies these setups for higher probability breakouts.
             "Bollinger, J. (2001). Bollinger on Bollinger Bands",
             "Keltner Channel and ATR-based systems"
         ]
+    },
+    
+    # NEW FUNDAMENTAL MODELS
+    "ev_ebitda": {
+        "name": "EV/EBITDA Screen",
+        "category": "Fundamental",
+        "summary": "Enterprise Value to EBITDA - Better than P/E for cross-company comparisons",
+        "description": """
+**EV/EBITDA Screen** uses Enterprise Value to EBITDA ratio for valuation analysis.
+
+**Why EV/EBITDA is better than P/E:**
+- Capital structure neutral (accounts for debt)
+- Less affected by accounting differences (depreciation methods)
+- Better for comparing companies across industries
+- Excludes non-cash charges
+
+**Formula:**
+- EV = Market Cap + Total Debt - Cash
+- EV/EBITDA = Enterprise Value / EBITDA
+
+**Interpretation:**
+- Low EV/EBITDA (< 10): Potentially undervalued
+- Average (10-15): Fair value
+- High (> 15): Potentially overvalued
+
+**Best used for:**
+- Comparing companies with different capital structures
+- M&A analysis (acquirers look at EV/EBITDA)
+- Capital-intensive industries
+        """,
+        "parameters": {
+            "max_ev_ebitda": {"default": 15.0, "description": "Maximum EV/EBITDA for BUY signal"},
+            "min_ev_ebitda": {"default": 0.0, "description": "Minimum EV/EBITDA (avoid negative)"},
+            "min_ebitda_margin": {"default": 10.0, "description": "Minimum EBITDA margin %"},
+            "prefer_low_debt": {"default": True, "description": "Prefer companies with low debt"},
+            "debt_to_ebitda_max": {"default": 4.0, "description": "Maximum Debt/EBITDA ratio"}
+        },
+        "signals": {
+            "buy": "Low EV/EBITDA with healthy margins and manageable debt",
+            "sell": "High EV/EBITDA or negative EBITDA"
+        },
+        "references": [
+            "Damodaran, A. - Investment Valuation",
+            "Enterprise Value analysis in M&A"
+        ]
+    },
+    
+    "fcf_yield": {
+        "name": "FCF Yield",
+        "category": "Fundamental",
+        "summary": "Free Cash Flow Yield - Focus on actual cash generation",
+        "description": """
+**Free Cash Flow Yield** identifies stocks generating strong cash relative to price.
+
+**Why FCF matters:**
+- Cash is harder to manipulate than earnings
+- Shows actual cash generation ability
+- Better indicator of dividend sustainability
+- Warren Buffett's preferred metric
+
+**Formula:**
+- FCF = Operating Cash Flow - Capital Expenditures
+- FCF Yield = (FCF / Market Cap) × 100
+
+**Interpretation:**
+- High FCF Yield (> 8%): Potentially undervalued cash generator
+- Average (4-8%): Fair value
+- Low (< 4%): May be overvalued or capital-intensive
+
+**Key metrics:**
+- FCF Margin: FCF as % of revenue
+- FCF Conversion: FCF / Net Income (> 100% is excellent)
+- CapEx Ratio: CapEx as % of Operating Cash Flow
+        """,
+        "parameters": {
+            "min_fcf_yield": {"default": 5.0, "description": "Minimum FCF yield % for BUY"},
+            "min_fcf_margin": {"default": 5.0, "description": "Minimum FCF margin %"},
+            "require_positive_fcf": {"default": True, "description": "Require positive FCF"},
+            "max_capex_ratio": {"default": 50.0, "description": "Maximum CapEx as % of OCF"}
+        },
+        "signals": {
+            "buy": "High FCF yield with consistent cash generation",
+            "sell": "Negative FCF or very low yield"
+        },
+        "references": [
+            "Buffett, W. - Owner Earnings concept",
+            "Free Cash Flow analysis in value investing"
+        ]
+    },
+    
+    "momentum_value": {
+        "name": "Momentum + Value Combo",
+        "category": "Fundamental",
+        "summary": "Factor investing combining value metrics with price momentum",
+        "description": """
+**Momentum + Value Combo** combines two proven investment factors.
+
+**Factor Investing Research:**
+- Value and Momentum are two of the most robust factors
+- Combining factors can improve risk-adjusted returns
+- Value stocks with momentum outperform pure value or pure momentum
+
+**Value Component:**
+- P/E Ratio (lower is better)
+- P/B Ratio (lower is better)
+- P/S Ratio (lower is better)
+- Dividend Yield (higher is better)
+
+**Momentum Component:**
+- 6-month price momentum
+- 12-month price momentum
+- Recent trend confirmation (1-3 months)
+
+**Why it works:**
+- Value identifies cheap stocks
+- Momentum confirms the market is recognizing value
+- Avoids "value traps" (cheap stocks that stay cheap)
+        """,
+        "parameters": {
+            "value_weight": {"default": 0.5, "description": "Weight for value score (0-1)"},
+            "momentum_weight": {"default": 0.5, "description": "Weight for momentum score (0-1)"},
+            "max_pe": {"default": 25.0, "description": "Maximum P/E for value score"},
+            "max_pb": {"default": 5.0, "description": "Maximum P/B for value score"},
+            "min_momentum_6m": {"default": 0.0, "description": "Minimum 6-month momentum %"},
+            "min_momentum_12m": {"default": 0.0, "description": "Minimum 12-month momentum %"}
+        },
+        "signals": {
+            "buy": "Undervalued stock with positive momentum",
+            "sell": "Overvalued stock with negative momentum"
+        },
+        "references": [
+            "Asness, C. - Value and Momentum Everywhere",
+            "Fama-French Factor Research"
+        ]
     }
 }
 

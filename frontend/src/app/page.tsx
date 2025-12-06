@@ -145,7 +145,7 @@ export default function Home() {
   const [selDoc, setSelDoc] = useState<string|null>(null);
   const [newUni, setNewUni] = useState({ name: '', desc: '', tickers: '', market: 'US' });
   
-  // Backtesting state
+  // Backtesting state (VectorBT)
   const [backtestModel, setBacktestModel] = useState<string>('');
   const [backtestUniverse, setBacktestUniverse] = useState('sp50');
   const [backtestCapital, setBacktestCapital] = useState(100000);
@@ -153,6 +153,19 @@ export default function Home() {
   const [backtestTopN, setBacktestTopN] = useState(10);
   const [backtestRunning, setBacktestRunning] = useState(false);
   const [backtestResults, setBacktestResults] = useState<BacktestResult | null>(null);
+  const [backtestPositionSize, setBacktestPositionSize] = useState('equal');
+  const [backtestMaxPositions, setBacktestMaxPositions] = useState(20);
+  
+  // Advanced Backtesting state
+  const [tearsheetData, setTearsheetData] = useState<any>(null);
+  const [tearsheetLoading, setTearsheetLoading] = useState(false);
+  const [walkForwardResults, setWalkForwardResults] = useState<any>(null);
+  const [walkForwardLoading, setWalkForwardLoading] = useState(false);
+  const [monteCarloResults, setMonteCarloResults] = useState<any>(null);
+  const [monteCarloLoading, setMonteCarloLoading] = useState(false);
+  const [optimizationResults, setOptimizationResults] = useState<any>(null);
+  const [optimizationLoading, setOptimizationLoading] = useState(false);
+  const [backtestCapabilities, setBacktestCapabilities] = useState<any>(null);
   
   // Advanced features state
   const [signalCombinerUniverse, setSignalCombinerUniverse] = useState('sp50');
