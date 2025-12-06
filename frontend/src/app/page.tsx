@@ -188,7 +188,21 @@ export default function Home() {
     try { const r = await fetch(`${API_URL}/api/universe/`); if (r.ok) { const d = await r.json(); setUniverses(d.universes); } } catch(e) {}
     try { const r = await fetch(`${API_URL}/api/custom-universe/`); if (r.ok) { const d = await r.json(); setCustomUniverses(d.universes); } } catch(e) {}
     try { const r = await fetch(`${API_URL}/api/models/docs`); if (r.ok) { const d = await r.json(); setModelDocs(d); } } catch(e) {}
-    try { const r = await fetch(`${API_URL}/api/models/history`); if (r.ok) { const d = await r.json(); setHistory(d.runs || []); } } catch(e) {}
+    try { 
+      const r = await fetch(`${API_URL}/api/models/history`); 
+      if (r.ok) { 
+        const d = await r.json(); 
+        setHistory(d.runs || []); 
+        if (d.runs && d.runs.length > 0) {
+          log('info', `Loaded ${d.runs.length} history records`);
+        }
+      } else {
+        const errorText = await r.text();
+        log('error', `Failed to load history: ${r.status} ${errorText}`);
+      }
+    } catch(e: any) { 
+      log('error', `Failed to load history: ${e.message || e}`); 
+    }
   };
 
   const runModel = async (id: string) => {
@@ -699,7 +713,13 @@ export default function Home() {
                 </button>
               </div>
             </div>
-            {history.length === 0 ? <p>No runs yet.</p> : (
+            {history.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--muted-foreground)' }}>
+                <p style={{ marginBottom: '1rem' }}>No runs yet.</p>
+                <p style={{ fontSize: '0.875rem' }}>Run a model from the Models tab to see history here.</p>
+                <button style={{ ...S.btn('primary'), marginTop: '1rem' }} onClick={loadAll}>🔄 Check Again</button>
+              </div>
+            ) : (
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                 <thead><tr style={{ background: 'var(--muted)' }}><th style={{ padding: '10px', textAlign: 'left', color: 'var(--muted-foreground)' }}>Time</th><th style={{ color: 'var(--muted-foreground)' }}>Model</th><th style={{ color: 'var(--muted-foreground)' }}>Universe</th><th style={{ color: 'var(--muted-foreground)' }}>Buy</th><th style={{ color: 'var(--muted-foreground)' }}>Sell</th><th style={{ color: 'var(--muted-foreground)' }}>Actions</th></tr></thead>
                 <tbody>

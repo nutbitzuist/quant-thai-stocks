@@ -197,19 +197,26 @@ async def run_model(request: RunModelRequest):
     fetch_errors = fetcher.get_errors()
     
     # Save to history
-    history_service = get_history_service()
-    record = history_service.add_run(
-        model_id=request.model_id,
-        model_name=result.model_name,
-        category=result.category,
-        universe=request.universe,
-        total_analyzed=len(tickers),
-        stocks_with_data=len(price_data),
-        buy_signals=[s.to_dict() for s in result.get_buy_signals(request.top_n)],
-        sell_signals=[s.to_dict() for s in result.get_sell_signals(request.top_n)],
-        parameters=result.parameters,
-        errors=result.errors
-    )
+    try:
+        history_service = get_history_service()
+        record = history_service.add_run(
+            model_id=request.model_id,
+            model_name=result.model_name,
+            category=result.category,
+            universe=request.universe,
+            total_analyzed=len(tickers),
+            stocks_with_data=len(price_data),
+            buy_signals=[s.to_dict() for s in result.get_buy_signals(request.top_n)],
+            sell_signals=[s.to_dict() for s in result.get_sell_signals(request.top_n)],
+            parameters=result.parameters,
+            errors=result.errors
+        )
+        logger.info(f"Saved run to history: {record.id}")
+    except Exception as e:
+        logger.error(f"Failed to save run to history: {str(e)}", exc_info=True)
+        # Create a dummy record ID if history save fails
+        record_id = f"run_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        record = type('Record', (), {'id': record_id})()
     
     return RunModelResponse(
         run_id=record.id,
