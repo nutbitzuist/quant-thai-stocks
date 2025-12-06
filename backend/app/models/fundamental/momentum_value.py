@@ -226,7 +226,7 @@ class MomentumValueModel(FundamentalModel):
                 results.append({
                     'ticker': ticker,
                     'score': round(combined_score, 2),
-                    'signal': signal_type,
+                    'signal_type': signal_type,  # Must be signal_type for base class
                     'value_score': round(value_score, 2),
                     'momentum_score': round(momentum_score, 2),
                     **value_metrics,

@@ -196,7 +196,7 @@ class FCFYieldModel(FundamentalModel):
                 results.append({
                     'ticker': ticker,
                     'score': round(score, 2),
-                    'signal': signal_type,
+                    'signal_type': signal_type,  # Must be signal_type for base class
                     'fcf_yield': round(fcf_yield, 2) if fcf_yield else None,
                     'fcf_margin': round(fcf_margin, 2) if fcf_margin else None,
                     'capex_ratio': round(capex_ratio, 2) if capex_ratio else None,

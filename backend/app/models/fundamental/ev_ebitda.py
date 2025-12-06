@@ -179,7 +179,7 @@ class EVEBITDAModel(FundamentalModel):
                 results.append({
                     'ticker': ticker,
                     'score': round(score, 2),
-                    'signal': signal_type,
+                    'signal_type': signal_type,  # Must be signal_type for base class
                     'ev_ebitda': round(ev_ebitda, 2) if ev_ebitda else None,
                     'ebitda_margin': round(ebitda_margin, 2) if ebitda_margin else None,
                     'debt_to_ebitda': round(debt_to_ebitda, 2) if debt_to_ebitda else None,
