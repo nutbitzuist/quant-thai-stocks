@@ -524,7 +524,7 @@ export default function Home() {
     try {
       const r2 = await fetch(`${API_URL}/api/universe/${universeId}/stocks`);
       if (r2.ok) {
-        const d2 = await r.json();
+        const d2 = await r2.json();
         setUniverseStocks(d2.stocks || []);
       } else {
         const errorText = await r2.text();
