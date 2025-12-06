@@ -1,0 +1,31 @@
+# Core Framework
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
+
+# Data & Finance
+yfinance>=0.2.36  # Primary data source (Yahoo Finance)
+pandas>=2.1.0
+numpy>=1.26.0
+
+# Optional Data Providers (install as needed for better data quality/redundancy)
+# Uncomment the ones you want to use:
+# pandas-datareader>=0.10.0  # Alternative data source (Yahoo, Stooq, FRED, etc.)
+# alpha-vantage>=2.3.1  # Alpha Vantage API (requires API key: set ALPHA_VANTAGE_API_KEY env var)
+# yahooquery>=2.3.1  # Alternative Yahoo Finance library (more reliable for some markets)
+# investpy>=1.0.9  # Investing.com data (good for international stocks including Thai stocks)
+# quandl>=3.7.0  # Quandl/Nasdaq Data Link (requires API key)
+
+# PDF Generation
+reportlab>=4.0.0
+
+# HTTP Client
+httpx>=0.26.0
+aiohttp>=3.9.0
+
+# Utilities
+python-dotenv>=1.0.0
+python-multipart>=0.0.6
+
+# Note: Run with Python 3.10+ for best compatibility
