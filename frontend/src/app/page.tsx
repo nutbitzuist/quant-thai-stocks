@@ -123,7 +123,7 @@ const S = {
 };
 
 export default function Home() {
-  const [tab, setTab] = useState<'history'|'models'|'universe'|'backtest'|'advanced'|'status'>('models');
+  const [tab, setTab] = useState<'models'|'advanced'|'backtest'|'universe'|'model-detail'|'history'|'status'|'settings'>('models');
   const [models, setModels] = useState<Model[]>([]);
   const [results, setResults] = useState<Record<string, ModelResult>>({});
   const [running, setRunning] = useState<string|null>(null);
@@ -664,24 +664,14 @@ export default function Home() {
             <optgroup label="Built-in">{universes.map(u => <option key={u.id} value={u.id}>{u.name} ({u.count})</option>)}</optgroup>
             {customUniverses.length > 0 && <optgroup label="Custom">{customUniverses.map(u => <option key={u.id} value={u.id}>{u.name} ({u.count})</option>)}</optgroup>}
           </select>
-          <label style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            Top N:
-            <select style={{ ...S.select, background: 'var(--background)', padding: '0.25rem 0.5rem', fontSize: '0.75rem' }} value={topN} onChange={e => setTopN(Number(e.target.value))}>
-              <option value={5}>5</option>
-              <option value={10}>10</option>
-              <option value={20}>20</option>
-              <option value={50}>50</option>
-              <option value={100}>100</option>
-            </select>
-          </label>
         </div>
       </div>
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: '0.5rem', background: 'var(--card)', padding: '0.75rem 1.25rem', borderBottom: '1px solid var(--border)', flexWrap: 'wrap' }}>
-        {(['history', 'models', 'universe', 'backtest', 'advanced', 'status'] as const).map(t => (
+        {(['models', 'advanced', 'backtest', 'universe', 'model-detail', 'history', 'status', 'settings'] as const).map(t => (
           <button key={t} style={S.tab(tab === t)} onClick={() => setTab(t)}>
-            {t === 'history' ? '📜 History' : t === 'models' ? '📚 Models' : t === 'universe' ? '🌐 Universe' : t === 'backtest' ? '📊 Backtest' : t === 'advanced' ? '⚡ Advanced' : '🔧 Status'}
+            {t === 'models' ? '📚 Models' : t === 'advanced' ? '⚡ Advanced' : t === 'backtest' ? '📊 Backtest' : t === 'universe' ? '🌐 Universe' : t === 'model-detail' ? '📖 Model Details' : t === 'history' ? '📜 History' : t === 'status' ? '🔧 Status' : '⚙️ Settings'}
           </button>
         ))}
       </div>
@@ -1381,6 +1371,176 @@ export default function Home() {
                   <span style={{ color: 'var(--primary)', fontWeight: '600', minWidth: '1.5rem' }}>4.</span>
                   <div style={{ flex: 1, color: 'var(--foreground)' }}>
                     Test: <a href="http://localhost:8000/health" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)', textDecoration: 'none', borderBottom: '1px solid var(--primary)', transition: 'opacity 0.2s ease' }} onMouseEnter={(e) => e.currentTarget.style.opacity = '0.8'} onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}>http://localhost:8000/health</a>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* MODEL DETAIL */}
+        {tab === 'model-detail' && (
+          <>
+            <div style={S.card}>
+              <h2 style={{ marginTop: 0 }}>📖 Model Documentation</h2>
+              <p style={{ color: 'var(--muted-foreground)', marginBottom: '1rem' }}>Select a model to view detailed documentation, parameters, and usage instructions.</p>
+              
+              {Object.keys(modelDocs).length === 0 ? (
+                <p style={{ color: 'var(--muted-foreground)' }}>Loading model documentation...</p>
+              ) : (
+                <>
+                  <div style={{ marginBottom: '1rem' }}>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>Select Model:</label>
+                    <select 
+                      style={{ ...S.select, width: '100%', maxWidth: '400px' }} 
+                      value={selDoc || ''} 
+                      onChange={e => setSelDoc(e.target.value || null)}
+                    >
+                      <option value="">-- Select a model --</option>
+                      {Object.entries(modelDocs).map(([id, doc]: [string, any]) => (
+                        <option key={id} value={id}>{doc.name || id} ({doc.category || 'Unknown'})</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {selDoc && modelDocs[selDoc] && (
+                    <div style={{ borderTop: '1px solid var(--border)', paddingTop: '1rem', marginTop: '1rem' }}>
+                      {(() => {
+                        const doc = modelDocs[selDoc];
+                        return (
+                          <>
+                            <div style={{ marginBottom: '1rem' }}>
+                              <h3 style={{ margin: '0 0 0.5rem 0', color: 'var(--foreground)' }}>{doc.name || selDoc}</h3>
+                              <span style={{ 
+                                fontSize: '0.75rem', 
+                                padding: '0.25rem 0.5rem', 
+                                borderRadius: 'var(--radius)', 
+                                background: doc.category === 'Technical' ? 'var(--accent)' : 'var(--muted)', 
+                                color: doc.category === 'Technical' ? 'var(--accent-foreground)' : 'var(--muted-foreground)'
+                              }}>
+                                {doc.category || 'Unknown'}
+                              </span>
+                            </div>
+
+                            {doc.summary && (
+                              <div style={{ marginBottom: '1rem' }}>
+                                <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.875rem', fontWeight: '600', color: 'var(--foreground)' }}>Summary</h4>
+                                <p style={{ color: 'var(--muted-foreground)', margin: 0, lineHeight: '1.6' }}>{doc.summary}</p>
+                              </div>
+                            )}
+
+                            {doc.description && (
+                              <div style={{ marginBottom: '1rem' }}>
+                                <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.875rem', fontWeight: '600', color: 'var(--foreground)' }}>Description</h4>
+                                <p style={{ color: 'var(--muted-foreground)', margin: 0, lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>{doc.description}</p>
+                              </div>
+                            )}
+
+                            {doc.parameters && Object.keys(doc.parameters).length > 0 && (
+                              <div style={{ marginBottom: '1rem' }}>
+                                <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.875rem', fontWeight: '600', color: 'var(--foreground)' }}>Parameters</h4>
+                                <div style={{ background: 'var(--muted)', borderRadius: 'var(--radius)', padding: '0.75rem' }}>
+                                  {Object.entries(doc.parameters).map(([key, param]: [string, any]) => (
+                                    <div key={key} style={{ marginBottom: '0.5rem', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border)' }}>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.25rem' }}>
+                                        <code style={{ background: 'var(--background)', padding: '0.125rem 0.375rem', borderRadius: 'var(--radius)', fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: 'var(--foreground)' }}>{key}</code>
+                                        {param.default !== undefined && (
+                                          <span style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>Default: {String(param.default)}</span>
+                                        )}
+                                      </div>
+                                      {param.description && (
+                                        <p style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)', margin: 0 }}>{param.description}</p>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {doc.signals && (
+                              <div style={{ marginBottom: '1rem' }}>
+                                <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.875rem', fontWeight: '600', color: 'var(--foreground)' }}>Signals</h4>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem' }}>
+                                  {doc.signals.buy && (
+                                    <div style={{ background: 'rgba(34, 197, 94, 0.1)', border: '1px solid #22c55e', borderRadius: 'var(--radius)', padding: '0.75rem' }}>
+                                      <div style={{ fontSize: '0.75rem', fontWeight: '600', color: '#22c55e', marginBottom: '0.25rem' }}>🟢 Buy Signal</div>
+                                      <p style={{ fontSize: '0.75rem', color: 'var(--foreground)', margin: 0 }}>{doc.signals.buy}</p>
+                                    </div>
+                                  )}
+                                  {doc.signals.sell && (
+                                    <div style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid var(--destructive)', borderRadius: 'var(--radius)', padding: '0.75rem' }}>
+                                      <div style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--destructive)', marginBottom: '0.25rem' }}>🔴 Sell Signal</div>
+                                      <p style={{ fontSize: '0.75rem', color: 'var(--foreground)', margin: 0 }}>{doc.signals.sell}</p>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+
+                            {doc.references && doc.references.length > 0 && (
+                              <div style={{ marginBottom: '1rem' }}>
+                                <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.875rem', fontWeight: '600', color: 'var(--foreground)' }}>References</h4>
+                                <ul style={{ margin: 0, paddingLeft: '1.25rem', color: 'var(--muted-foreground)', fontSize: '0.875rem' }}>
+                                  {doc.references.map((ref: string, i: number) => (
+                                    <li key={i} style={{ marginBottom: '0.25rem' }}>{ref}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </>
+        )}
+
+        {/* SETTINGS */}
+        {tab === 'settings' && (
+          <>
+            <div style={S.card}>
+              <h2 style={{ marginTop: 0 }}>⚙️ Settings</h2>
+              <p style={{ color: 'var(--muted-foreground)', marginBottom: '1.5rem' }}>Configure application preferences and default values.</p>
+              
+              <div style={{ marginBottom: '1.5rem' }}>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500', color: 'var(--foreground)' }}>
+                  Top N Signals
+                </label>
+                <p style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)', margin: '0 0 0.75rem 0' }}>
+                  Number of top signals to display when running models (default: 10)
+                </p>
+                <select 
+                  style={{ ...S.select, background: 'var(--background)', maxWidth: '200px' }} 
+                  value={topN} 
+                  onChange={e => setTopN(Number(e.target.value))}
+                >
+                  <option value={5}>5</option>
+                  <option value={10}>10</option>
+                  <option value={20}>20</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+              </div>
+
+              <div style={{ borderTop: '1px solid var(--border)', paddingTop: '1rem', marginTop: '1rem' }}>
+                <h3 style={{ margin: '0 0 0.75rem 0', fontSize: '1rem', fontWeight: '600' }}>Current Configuration</h3>
+                <div style={{ background: 'var(--muted)', borderRadius: 'var(--radius)', padding: '0.75rem', fontFamily: 'var(--font-mono)', fontSize: '0.75rem' }}>
+                  <div style={{ marginBottom: '0.5rem' }}>
+                    <span style={{ color: 'var(--muted-foreground)' }}>Top N Signals:</span>{' '}
+                    <span style={{ color: 'var(--foreground)', fontWeight: '600' }}>{topN}</span>
+                  </div>
+                  <div style={{ marginBottom: '0.5rem' }}>
+                    <span style={{ color: 'var(--muted-foreground)' }}>Default Universe:</span>{' '}
+                    <span style={{ color: 'var(--foreground)', fontWeight: '600' }}>{universe}</span>
+                  </div>
+                  <div>
+                    <span style={{ color: 'var(--muted-foreground)' }}>Backend Status:</span>{' '}
+                    <span style={{ color: connected ? '#22c55e' : 'var(--destructive)', fontWeight: '600' }}>
+                      {connected ? 'Connected' : 'Disconnected'}
+                    </span>
                   </div>
                 </div>
               </div>
