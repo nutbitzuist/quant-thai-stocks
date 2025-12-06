@@ -46,7 +46,8 @@ interface BacktestResult {
 // Helper function to remove markdown formatting
 const cleanMarkdown = (text: string): string => {
   if (!text) return text;
-  return text.replace(/\*\*/g, '').trim();
+  // Remove both single and double asterisks (markdown bold/italic)
+  return text.replace(/\*\*/g, '').replace(/\*/g, '').trim();
 };
 
 const S = {
