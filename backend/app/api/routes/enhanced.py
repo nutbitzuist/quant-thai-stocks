@@ -18,6 +18,7 @@ from app.services.enhanced_combiner import (
 )
 from app.services.signal_context import get_signal_context_builder
 from app.services.market_regime import get_regime_detector
+from app.services.model_validation import ModelValidator, validate_model_historical
 from app.api.routes.models import ALL_MODELS
 
 logger = logging.getLogger(__name__)
@@ -340,4 +341,158 @@ async def get_signal_context(
         
     except Exception as e:
         logger.error(f"Error getting signal context: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==================== MODEL VALIDATION ====================
+
+class ValidateModelRequest(BaseModel):
+    """Request for model validation"""
+    model_id: str = Field(..., description="Model ID to validate")
+    universe: str = Field(default="sp50", description="Universe to test on")
+    holding_period: int = Field(default=21, description="Holding period in trading days")
+    n_simulations: int = Field(default=50, description="Number of historical simulations")
+
+
+@router.post("/validate-model")
+async def validate_model(request: ValidateModelRequest) -> Dict:
+    """
+    Validate a model's effectiveness through historical backtesting.
+    
+    Returns comprehensive metrics including:
+    - Win rate, profit factor, average returns
+    - Statistical significance (t-test, p-value)
+    - Risk metrics (Sharpe, Sortino, max drawdown)
+    - Comparison to benchmark (alpha, beta)
+    - Verdict: EXCELLENT, GOOD, MARGINAL, or POOR
+    """
+    try:
+        if request.model_id not in ALL_MODELS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unknown model: {request.model_id}"
+            )
+        
+        logger.info(f"Validating model: {request.model_id}")
+        
+        # Get tickers
+        tickers = get_tickers(request.universe)
+        if not tickers:
+            raise HTTPException(status_code=400, detail=f"Unknown universe: {request.universe}")
+        
+        # Fetch data
+        fetcher = get_fetcher()
+        price_data = fetcher.get_bulk_price_data(tickers, period="2y")
+        fundamental_data = fetcher.get_bulk_fundamental_data(tickers)
+        
+        # Run validation
+        model_class = ALL_MODELS[request.model_id]
+        
+        metrics = validate_model_historical(
+            model_class=model_class,
+            model_id=request.model_id,
+            price_data=price_data,
+            fundamental_data=fundamental_data,
+            holding_period=request.holding_period,
+            n_simulations=request.n_simulations
+        )
+        
+        return {
+            "timestamp": datetime.now().isoformat(),
+            "request": {
+                "model_id": request.model_id,
+                "universe": request.universe,
+                "holding_period": request.holding_period,
+                "n_simulations": request.n_simulations,
+            },
+            "validation": metrics.to_dict()
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error validating model: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/validate-all-models")
+async def validate_all_models(
+    universe: str = Query("sp50", description="Universe to test on"),
+    holding_period: int = Query(21, description="Holding period in days"),
+    n_simulations: int = Query(30, description="Simulations per model")
+) -> Dict:
+    """
+    Validate all models and rank them by effectiveness.
+    
+    Returns a leaderboard of models sorted by their validation score.
+    """
+    try:
+        logger.info(f"Validating all models on {universe}")
+        
+        # Get tickers
+        tickers = get_tickers(universe)
+        if not tickers:
+            raise HTTPException(status_code=400, detail=f"Unknown universe: {universe}")
+        
+        # Fetch data once
+        fetcher = get_fetcher()
+        price_data = fetcher.get_bulk_price_data(tickers, period="2y")
+        fundamental_data = fetcher.get_bulk_fundamental_data(tickers)
+        
+        results = []
+        
+        for model_id, model_class in ALL_MODELS.items():
+            try:
+                logger.info(f"Validating {model_id}...")
+                
+                metrics = validate_model_historical(
+                    model_class=model_class,
+                    model_id=model_id,
+                    price_data=price_data,
+                    fundamental_data=fundamental_data,
+                    holding_period=holding_period,
+                    n_simulations=n_simulations
+                )
+                
+                result_dict = metrics.to_dict()
+                results.append({
+                    "model_id": model_id,
+                    "model_name": metrics.model_name,
+                    "verdict": result_dict["verdict"]["verdict"],
+                    "score": result_dict["verdict"]["score"],
+                    "win_rate": metrics.win_rate,
+                    "avg_return": metrics.avg_return,
+                    "sharpe_ratio": metrics.sharpe_ratio,
+                    "is_significant": metrics.is_significant,
+                    "alpha": metrics.alpha,
+                    "total_signals": metrics.total_signals,
+                })
+                
+            except Exception as e:
+                logger.warning(f"Failed to validate {model_id}: {e}")
+                results.append({
+                    "model_id": model_id,
+                    "model_name": model_id,
+                    "verdict": "ERROR",
+                    "score": 0,
+                    "error": str(e)
+                })
+        
+        # Sort by score
+        results.sort(key=lambda x: x.get("score", 0), reverse=True)
+        
+        return {
+            "timestamp": datetime.now().isoformat(),
+            "universe": universe,
+            "holding_period": holding_period,
+            "models_tested": len(results),
+            "leaderboard": results,
+            "top_models": [r["model_id"] for r in results[:5] if r.get("verdict") in ["EXCELLENT", "GOOD"]],
+            "avoid_models": [r["model_id"] for r in results if r.get("verdict") == "POOR"]
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error validating all models: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
