@@ -673,6 +673,12 @@ export default function Home() {
     }); 
   }, []);
 
+  // Reload history when history tab is opened
+  useEffect(() => {
+    if (tab === 'history') {
+      loadAll();
+    }
+  }, [tab]);
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--background)', color: 'var(--foreground)' }}>
