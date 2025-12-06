@@ -43,6 +43,12 @@ from app.models.fundamental.earnings_momentum import EarningsMomentumModel
 from app.models.fundamental.garp import GARPModel
 from app.models.fundamental.altman_z import AltmanZScoreModel
 
+# Import all models - QUANTITATIVE (4)
+from app.models.quantitative.mean_reversion import MeanReversionModel
+from app.models.quantitative.pairs_trading import PairsTradingModel
+from app.models.quantitative.factor_momentum import FactorMomentumModel
+from app.models.quantitative.volatility_breakout import VolatilityBreakoutModel
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
@@ -75,7 +81,15 @@ FUNDAMENTAL_MODELS = {
     "altman_z": AltmanZScoreModel,
 }
 
-ALL_MODELS = {**TECHNICAL_MODELS, **FUNDAMENTAL_MODELS}
+# Model registry - 4 Quantitative/Statistical Models
+QUANTITATIVE_MODELS = {
+    "mean_reversion": MeanReversionModel,
+    "pairs_trading": PairsTradingModel,
+    "factor_momentum": FactorMomentumModel,
+    "volatility_breakout": VolatilityBreakoutModel,
+}
+
+ALL_MODELS = {**TECHNICAL_MODELS, **FUNDAMENTAL_MODELS, **QUANTITATIVE_MODELS}
 
 
 class RunModelRequest(BaseModel):
@@ -122,6 +136,7 @@ async def list_models():
         "total": len(models),
         "technical": len(TECHNICAL_MODELS),
         "fundamental": len(FUNDAMENTAL_MODELS),
+        "quantitative": len(QUANTITATIVE_MODELS),
         "models": models
     }
 

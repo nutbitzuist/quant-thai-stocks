@@ -21,6 +21,7 @@ class SignalType(Enum):
 class ModelCategory(Enum):
     TECHNICAL = "Technical"
     FUNDAMENTAL = "Fundamental"
+    QUANTITATIVE = "Quantitative"
 
 
 @dataclass
@@ -211,3 +212,10 @@ class FundamentalModel(BaseModel):
     
     def __init__(self, name: str, description: str, parameters: Dict[str, Any]):
         super().__init__(name, description, ModelCategory.FUNDAMENTAL, parameters)
+
+
+class QuantitativeModel(BaseModel):
+    """Base class for quantitative/statistical models"""
+    
+    def __init__(self, name: str, description: str, parameters: Dict[str, Any]):
+        super().__init__(name, description, ModelCategory.QUANTITATIVE, parameters)

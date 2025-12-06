@@ -598,6 +598,209 @@ EMA15 above EMA50 = bullish structure. Both EMAs rising = momentum.
         },
         "signals": {"buy": "Price above both EMAs, structure bullish", "sell": "Price below both EMAs"},
         "references": ["Standard EMA crossover systems"]
+    },
+    
+    # ========== QUANTITATIVE/STATISTICAL MODELS ==========
+    
+    "mean_reversion": {
+        "name": "Mean Reversion Z-Score",
+        "category": "Quantitative",
+        "summary": "Statistical arbitrage based on price deviation from mean",
+        "description": """
+The Mean Reversion model uses Z-Score to identify stocks that have deviated 
+significantly from their historical mean price.
+
+**How it works:**
+- Calculate rolling mean and standard deviation of price
+- Z-Score = (Current Price - Mean) / Standard Deviation
+- Z < -2: Price is 2+ standard deviations below mean (oversold)
+- Z > 2: Price is 2+ standard deviations above mean (overbought)
+
+**Statistical Basis:**
+Based on the principle that prices tend to revert to their mean over time.
+Extreme deviations are statistically unlikely to persist.
+
+**Half-Life Estimation:**
+The model estimates how quickly prices revert using autocorrelation analysis.
+Shorter half-life = faster mean reversion = better trading opportunity.
+
+**Best used for:**
+- Statistical arbitrage
+- Range-bound markets
+- Short-term mean reversion trades
+- Pairs trading setups
+
+**Caution:**
+- Trending markets can stay "extreme" for extended periods
+- Works best in stable, range-bound conditions
+- Combine with trend filters for better results
+        """,
+        "parameters": {
+            "lookback_period": {"default": 20, "description": "Rolling window for mean/std calculation"},
+            "z_buy_threshold": {"default": -2.0, "description": "Z-Score threshold for buy signal"},
+            "z_sell_threshold": {"default": 2.0, "description": "Z-Score threshold for sell signal"},
+            "min_data_points": {"default": 50, "description": "Minimum data points required"}
+        },
+        "signals": {
+            "buy": "Z-Score < -2 (price significantly below mean)",
+            "sell": "Z-Score > 2 (price significantly above mean)"
+        },
+        "references": [
+            "Avellaneda, M. & Lee, J.H. (2010). Statistical Arbitrage in the US Equities Market",
+            "Pole, A. (2007). Statistical Arbitrage"
+        ]
+    },
+    
+    "pairs_trading": {
+        "name": "Pairs Trading Setup",
+        "category": "Quantitative",
+        "summary": "Correlation-based statistical arbitrage between related stocks",
+        "description": """
+Pairs Trading identifies stocks that are highly correlated but have temporarily diverged.
+When the spread between correlated pairs deviates significantly, trade the convergence.
+
+**How it works:**
+1. Calculate correlation matrix for all stocks
+2. Find best correlated pair for each stock (correlation > 0.7)
+3. Calculate spread Z-Score between the pair
+4. Trade when spread deviates beyond threshold
+
+**Trading Logic:**
+- If spread Z < -2: Stock underperformed vs pair → BUY stock
+- If spread Z > 2: Stock outperformed vs pair → SELL stock
+- Expect spread to revert to historical relationship
+
+**Key Metrics:**
+- Correlation: How closely the pair moves together
+- Spread Z-Score: Current deviation from normal relationship
+- Relative Performance: Recent return difference
+
+**Best used for:**
+- Market-neutral strategies
+- Hedged positions
+- Sector-relative trades
+- Reducing market risk
+
+**Caution:**
+- Correlations can break down (regime change)
+- Requires both legs to execute properly
+- Transaction costs matter for tight spreads
+        """,
+        "parameters": {
+            "correlation_period": {"default": 60, "description": "Days for correlation calculation"},
+            "min_correlation": {"default": 0.7, "description": "Minimum correlation for valid pair"},
+            "spread_z_threshold": {"default": 2.0, "description": "Z-Score threshold for signal"},
+            "lookback_period": {"default": 20, "description": "Spread Z-Score lookback"}
+        },
+        "signals": {
+            "buy": "Spread Z < -2 (underperformed vs correlated pair)",
+            "sell": "Spread Z > 2 (outperformed vs correlated pair)"
+        },
+        "references": [
+            "Gatev, E., Goetzmann, W. & Rouwenhorst, K. (2006). Pairs Trading",
+            "Vidyamurthy, G. (2004). Pairs Trading: Quantitative Methods and Analysis"
+        ]
+    },
+    
+    "factor_momentum": {
+        "name": "Factor Momentum",
+        "category": "Quantitative",
+        "summary": "Momentum of momentum - trade accelerating trends",
+        "description": """
+Factor Momentum captures the "momentum of momentum" - stocks where the momentum 
+itself is accelerating or decelerating.
+
+**How it works:**
+- Calculate short-term momentum (20-day return)
+- Calculate long-term momentum (60-day return)
+- Measure momentum acceleration (change in momentum)
+- Buy when momentum is positive AND accelerating
+- Sell when momentum is negative AND decelerating
+
+**Why it works:**
+Research shows that momentum factor returns are themselves persistent.
+Accelerating momentum indicates strengthening trend conviction.
+Decelerating momentum warns of potential reversal.
+
+**Momentum Quality:**
+The model also measures momentum quality - how consistent the trend is.
+Higher quality = more days moving in trend direction.
+
+**Best used for:**
+- Trend following with timing
+- Avoiding momentum crashes
+- Position sizing based on conviction
+- Systematic momentum strategies
+
+**Key insight:**
+Traditional momentum can suffer "momentum crashes" when trends reverse.
+Factor momentum helps identify when momentum is strengthening vs weakening.
+        """,
+        "parameters": {
+            "short_momentum_period": {"default": 20, "description": "Short-term momentum period"},
+            "long_momentum_period": {"default": 60, "description": "Long-term momentum period"},
+            "momentum_change_period": {"default": 10, "description": "Period for acceleration calculation"},
+            "acceleration_threshold": {"default": 0.5, "description": "Threshold for significant acceleration"}
+        },
+        "signals": {
+            "buy": "Positive momentum + accelerating",
+            "sell": "Negative momentum + decelerating"
+        },
+        "references": [
+            "Ehsani, S. & Linnainmaa, J. (2020). Factor Momentum and the Momentum Factor",
+            "Gupta, T. & Kelly, B. (2019). Factor Momentum Everywhere"
+        ]
+    },
+    
+    "volatility_breakout": {
+        "name": "Volatility Breakout",
+        "category": "Quantitative",
+        "summary": "ATR-based breakout entries with volatility squeeze detection",
+        "description": """
+The Volatility Breakout model identifies stocks breaking out of their normal 
+volatility range, especially after periods of low volatility (squeeze).
+
+**How it works:**
+- Calculate ATR (Average True Range) for volatility measurement
+- Define breakout levels: Previous Close ± (ATR × Multiplier)
+- Detect volatility squeeze (ATR in bottom percentile)
+- Signal when price breaks through levels
+
+**Volatility Squeeze:**
+When volatility contracts (squeeze), it often precedes a big move.
+The model identifies these setups for higher probability breakouts.
+
+**Breakout Confirmation:**
+- Volume confirmation: Breakout with 1.5x average volume
+- ATR expansion: Volatility increasing on breakout
+- Price follow-through: Sustained move beyond breakout level
+
+**Best used for:**
+- Breakout trading
+- Volatility expansion strategies
+- Pre-earnings setups
+- Range contraction patterns
+
+**Key metrics:**
+- ATR %: Volatility as percentage of price
+- Volatility Percentile: Where current vol sits vs history
+- Volume Ratio: Current vs average volume
+        """,
+        "parameters": {
+            "atr_period": {"default": 14, "description": "ATR calculation period"},
+            "atr_multiplier": {"default": 2.0, "description": "ATR multiplier for breakout levels"},
+            "squeeze_period": {"default": 20, "description": "Period for squeeze detection"},
+            "squeeze_threshold": {"default": 0.7, "description": "Percentile threshold for squeeze"},
+            "volume_confirmation": {"default": True, "description": "Require volume confirmation"}
+        },
+        "signals": {
+            "buy": "Price breaks above upper level (especially from squeeze)",
+            "sell": "Price breaks below lower level"
+        },
+        "references": [
+            "Bollinger, J. (2001). Bollinger on Bollinger Bands",
+            "Keltner Channel and ATR-based systems"
+        ]
     }
 }
 

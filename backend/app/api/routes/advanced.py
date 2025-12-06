@@ -20,7 +20,8 @@ from app.services.sector_rotation import get_sector_analyzer
 from app.services.backtester import get_backtester
 from app.services.pdf_generator import get_pdf_generator
 
-from app.api.routes.models import ALL_MODELS, TECHNICAL_MODELS, FUNDAMENTAL_MODELS
+from app.api.routes.models import ALL_MODELS, TECHNICAL_MODELS, FUNDAMENTAL_MODELS, QUANTITATIVE_MODELS
+from app.services.market_regime import get_regime_detector
 
 logger = logging.getLogger(__name__)
 
@@ -190,8 +191,15 @@ async def detect_market_regime(
                 logger.warning(f"Could not fetch universe data for breadth: {e}", exc_info=True)
                 universe_data = None
         
-        # Market regime detection removed due to reliability issues
-        raise HTTPException(status_code=503, detail="Market regime detection is temporarily unavailable")
+        # Detect market regime
+        detector = get_regime_detector()
+        regime = detector.detect_regime(index_data, universe_data)
+        
+        return {
+            "index": index,
+            "universe": universe,
+            **detector.to_dict(regime)
+        }
     except HTTPException:
         raise
     except Exception as e:
@@ -201,8 +209,8 @@ async def detect_market_regime(
 
 @router.get("/market-regime/quick")
 async def quick_market_regime():
-    """Quick market regime check using SPY - DISABLED"""
-    raise HTTPException(status_code=503, detail="Market regime detection is temporarily unavailable")
+    """Quick market regime check using SPY"""
+    return await detect_market_regime(index="SPY", universe="sp50")
 
 
 @router.post("/signal-combiner/export-pdf")
