@@ -35,7 +35,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Quant Stock Analysis API",
     description="Quantitative analysis platform for US and Thai stocks",
-    version="2.0.0",
+    version="2.0.2",
     lifespan=lifespan
 )
 
@@ -60,7 +60,7 @@ async def root():
     return {
         "status": "ok",
         "message": "Quant Stock Analysis API is running",
-        "version": "2.0.0",
+        "version": "2.0.2",
         "timestamp": datetime.now().isoformat()
     }
 

@@ -684,7 +684,7 @@ export default function Home() {
     <div style={{ minHeight: '100vh', background: 'var(--background)', color: 'var(--foreground)' }}>
       {/* Header */}
       <div style={{ background: 'var(--card)', borderBottom: '1px solid var(--border)', padding: '1rem 1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: 'var(--shadow-sm)' }}>
-        <div><h1 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '600', color: 'var(--foreground)' }}>📈 Quant Stock Analysis v2</h1></div>
+        <div><h1 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '600', color: 'var(--foreground)' }}>📈 Quant Stock Analysis v2.0.2</h1></div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <span style={S.dot(connected)} />
           <select style={{ ...S.select, background: 'var(--background)' }} value={universe} onChange={e => setUniverse(e.target.value)}>
