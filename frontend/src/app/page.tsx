@@ -65,7 +65,7 @@ const S = {
     fontWeight: '500',
     transition: 'all 0.2s ease',
     boxShadow: 'var(--shadow-xs)'
-  } as React.CSSProperties),
+  } as React.CSSProperties & { onMouseEnter?: (e: React.MouseEvent<HTMLButtonElement>) => void; onMouseLeave?: (e: React.MouseEvent<HTMLButtonElement>) => void }),
   select: { 
     padding: '0.5rem 0.75rem', 
     borderRadius: 'var(--radius)', 
@@ -84,7 +84,8 @@ const S = {
     cursor: 'pointer', 
     fontWeight: a ? '600' : 'normal' as const, 
     fontSize: '0.875rem',
-    transition: 'all 0.2s ease'
+    transition: 'all 0.2s ease',
+    ...(a ? {} : { ':hover': { background: 'var(--muted)' } })
   } as React.CSSProperties),
   dot: (ok: boolean) => ({ 
     width: '10px', 
@@ -1059,15 +1060,15 @@ export default function Home() {
                     </div>
                   </div>
                   <div>
-                    <div style={{ fontSize: '12px', color: '#666' }}>Winning Trades</div>
+                    <div style={{ fontSize: '12px', color: 'var(--muted-foreground)' }}>Winning Trades</div>
                     <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#22c55e' }}>{backtestResults.trades.winning}</div>
                   </div>
                   <div>
-                    <div style={{ fontSize: '12px', color: '#666' }}>Losing Trades</div>
+                    <div style={{ fontSize: '12px', color: 'var(--muted-foreground)' }}>Losing Trades</div>
                     <div style={{ fontSize: '18px', fontWeight: 'bold', color: 'var(--destructive)' }}>{backtestResults.trades.losing}</div>
                   </div>
                   <div>
-                    <div style={{ fontSize: '12px', color: '#666' }}>Avg Win</div>
+                    <div style={{ fontSize: '12px', color: 'var(--muted-foreground)' }}>Avg Win</div>
                     <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#22c55e' }}>
                       +{backtestResults.trades.avg_win_pct.toFixed(2)}%
                     </div>
@@ -1079,7 +1080,7 @@ export default function Home() {
                     </div>
                   </div>
                   <div>
-                    <div style={{ fontSize: '12px', color: '#666' }}>Profit Factor</div>
+                    <div style={{ fontSize: '12px', color: 'var(--muted-foreground)' }}>Profit Factor</div>
                     <div style={{ fontSize: '18px', fontWeight: 'bold', color: backtestResults.trades.profit_factor >= 1.5 ? '#22c55e' : backtestResults.trades.profit_factor >= 1 ? '#f59e0b' : 'var(--destructive)' }}>
                       {backtestResults.trades.profit_factor.toFixed(2)}
                     </div>
@@ -1092,8 +1093,8 @@ export default function Home() {
                     <h4 style={{ marginTop: '30px', marginBottom: '15px' }}>All Trades ({backtestResults.recent_trades.length} total)</h4>
                     <div style={{ overflowX: 'auto', maxHeight: '600px', overflowY: 'auto' }}>
                       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
-                        <thead style={{ position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 1 }}>
-                          <tr style={{ background: '#f8f9fa' }}>
+                        <thead style={{ position: 'sticky', top: 0, background: 'var(--muted)', zIndex: 1 }}>
+                          <tr style={{ background: 'var(--muted)' }}>
                             <th style={{ padding: '8px', textAlign: 'left' }}>Entry</th>
                             <th style={{ padding: '8px', textAlign: 'left' }}>Exit</th>
                             <th style={{ padding: '8px', textAlign: 'left' }}>Ticker</th>
@@ -1167,7 +1168,7 @@ export default function Home() {
               </button>
               
               {signalCombinerResults && (
-                <div style={{ marginTop: '20px', padding: '15px', background: '#f8f9fa', borderRadius: '8px' }}>
+                <div style={{ marginTop: '20px', padding: '15px', background: 'var(--muted)', borderRadius: 'var(--radius)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
                     <h4 style={{ marginTop: 0 }}>Results ({signalCombinerResults.total_models_analyzed || 0} models analyzed)</h4>
                     <button style={{ ...S.btn('primary'), fontSize: '12px', padding: '6px 12px' }} onClick={() => downloadSignalCombinerPDF(signalCombinerResults)}>
