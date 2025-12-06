@@ -54,7 +54,7 @@ const S = {
 };
 
 export default function Home() {
-  const [tab, setTab] = useState<'dashboard'|'history'|'models'|'universe'|'backtest'|'advanced'|'status'>('dashboard');
+  const [tab, setTab] = useState<'history'|'models'|'universe'|'backtest'|'advanced'|'status'>('models');
   const [models, setModels] = useState<Model[]>([]);
   const [results, setResults] = useState<Record<string, ModelResult>>({});
   const [running, setRunning] = useState<string|null>(null);
@@ -88,10 +88,6 @@ export default function Home() {
   const [sectorRotationUniverse, setSectorRotationUniverse] = useState('sp500');
   const [sectorRotationRunning, setSectorRotationRunning] = useState(false);
   const [sectorRotationResults, setSectorRotationResults] = useState<any>(null);
-  
-  // Dashboard summary state
-  const [dashboardSummary, setDashboardSummary] = useState<any>(null);
-  const [dashboardLoading, setDashboardLoading] = useState(false);
   
   // Universe details state
   const [selectedUniverseId, setSelectedUniverseId] = useState<string | null>(null);
@@ -481,28 +477,6 @@ export default function Home() {
     } catch(e) { log('error', `Delete error: ${e}`); }
   };
 
-  const loadDashboardSummary = async () => {
-    setDashboardLoading(true);
-    try {
-      const r = await fetch(`${API_URL}/api/advanced/dashboard-summary?universe=${universe}`);
-      if (r.ok) {
-        const d = await r.json();
-        setDashboardSummary(d);
-        log('success', 'Dashboard summary loaded');
-      } else {
-        const errorText = await r.text();
-        try {
-          const e = JSON.parse(errorText);
-          log('error', `Dashboard summary failed: ${e.detail || r.statusText}`);
-        } catch {
-          log('error', `Dashboard summary failed: ${r.status} ${errorText}`);
-        }
-      }
-    } catch(e: any) { 
-      log('error', `Dashboard error: ${e.message || e}`); 
-    }
-    setDashboardLoading(false);
-  };
 
   const loadUniverseDetails = async (universeId: string) => {
     setSelectedUniverseId(universeId);
@@ -609,12 +583,6 @@ export default function Home() {
     }); 
   }, []);
 
-  // Auto-load dashboard when switching to dashboard tab
-  useEffect(() => {
-    if (tab === 'dashboard' && connected && !dashboardSummary && !dashboardLoading) {
-      loadDashboardSummary();
-    }
-  }, [tab, connected]);
 
   return (
     <div style={{ fontFamily: 'system-ui', minHeight: '100vh', background: '#f5f5f5' }}>
@@ -642,113 +610,16 @@ export default function Home() {
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: '5px', background: '#fff', padding: '10px 20px', borderBottom: '1px solid #e0e0e0', flexWrap: 'wrap' }}>
-        {(['dashboard', 'history', 'models', 'universe', 'backtest', 'advanced', 'status'] as const).map(t => (
+        {(['history', 'models', 'universe', 'backtest', 'advanced', 'status'] as const).map(t => (
           <button key={t} style={S.tab(tab === t)} onClick={() => setTab(t)}>
-            {t === 'dashboard' ? '🏠 Dashboard' : t === 'history' ? '📜 History' : t === 'models' ? '📚 Models' : t === 'universe' ? '🌐 Universe' : t === 'backtest' ? '📊 Backtest' : t === 'advanced' ? '⚡ Advanced' : '🔧 Status'}
+            {t === 'history' ? '📜 History' : t === 'models' ? '📚 Models' : t === 'universe' ? '🌐 Universe' : t === 'backtest' ? '📊 Backtest' : t === 'advanced' ? '⚡ Advanced' : '🔧 Status'}
           </button>
         ))}
       </div>
 
       <div style={{ padding: '20px' }}>
-        {/* DASHBOARD */}
-        {tab === 'dashboard' && (
-          <>
-            {!connected && <div style={{ ...S.card, background: '#fff3cd', borderLeft: '4px solid #ffc107' }}><h3>⚠️ Backend Not Connected</h3><p>Run: <code>cd backend && uvicorn app.main:app --reload</code></p></div>}
-            {connected && (
-              <>
-                {/* Dashboard Summary */}
-                <div style={S.card}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-                    <h2 style={{ margin: 0 }}>📊 Dashboard Summary</h2>
-                    <button style={{ ...S.btn('primary'), fontSize: '12px', padding: '6px 12px' }} onClick={loadDashboardSummary} disabled={dashboardLoading}>
-                      {dashboardLoading ? '⏳ Loading...' : '🔄 Refresh'}
-                    </button>
-                  </div>
-                  
-                  {dashboardLoading && (
-                    <p style={{ color: '#666', fontStyle: 'italic' }}>Loading dashboard summary...</p>
-                  )}
-                  
-                  {dashboardSummary && !dashboardLoading && (
-                    <div>
-                      <p style={{ fontSize: '12px', color: '#666', marginBottom: '15px' }}>
-                        <strong>What is this?</strong> The dashboard summary shows the best combined signals from multiple models, 
-                        giving you higher-confidence trading opportunities. Stocks with more confirmations across different models 
-                        are more likely to be profitable.
-                      </p>
-                      
-                      {dashboardSummary.market_regime && (
-                        <div style={{ marginBottom: '20px', padding: '15px', background: '#f8f9fa', borderRadius: '8px' }}>
-                          <h4 style={{ marginTop: 0 }}>Market Regime</h4>
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '10px' }}>
-                            <div><strong>Regime:</strong> {dashboardSummary.market_regime.regime}</div>
-                            <div><strong>Risk Level:</strong> {dashboardSummary.market_regime.risk_level}</div>
-                            <div><strong>Exposure:</strong> {dashboardSummary.market_regime.recommended_exposure}%</div>
-                          </div>
-                          <p style={{ marginTop: '10px', fontSize: '12px', color: '#666' }}>{dashboardSummary.market_regime.recommendation}</p>
-                        </div>
-                      )}
-                      
-                      {dashboardSummary.top_combined_buys && dashboardSummary.top_combined_buys.length > 0 && (
-                        <div style={{ marginBottom: '20px' }}>
-                          <h4>🟢 Top Combined Buy Signals ({dashboardSummary.models_analyzed} models analyzed)</h4>
-                          <p style={{ fontSize: '12px', color: '#666', marginBottom: '10px' }}>
-                            These stocks have strong buy signals from multiple models - higher confidence trades.
-                          </p>
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '10px' }}>
-                            {dashboardSummary.top_combined_buys.map((s: any, i: number) => (
-                              <div key={i} style={{ background: '#d4edda', padding: '10px', borderRadius: '5px', fontSize: '12px', border: '1px solid #28a745' }}>
-                                <div style={{ fontWeight: 'bold', marginBottom: '5px' }}>{s.ticker?.replace('.BK', '')}</div>
-                                <div style={{ color: '#666' }}>{s.confirmations} confirmations</div>
-                                {s.avg_score && <div style={{ fontSize: '11px', color: '#666', marginTop: '3px' }}>Score: {s.avg_score.toFixed(2)}</div>}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      
-                      {dashboardSummary.top_combined_sells && dashboardSummary.top_combined_sells.length > 0 && (
-                        <div>
-                          <h4>🔴 Top Combined Sell Signals</h4>
-                          <p style={{ fontSize: '12px', color: '#666', marginBottom: '10px' }}>
-                            These stocks have strong sell signals from multiple models - consider exiting positions.
-                          </p>
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '10px' }}>
-                            {dashboardSummary.top_combined_sells.map((s: any, i: number) => (
-                              <div key={i} style={{ background: '#f8d7da', padding: '10px', borderRadius: '5px', fontSize: '12px', border: '1px solid #dc3545' }}>
-                                <div style={{ fontWeight: 'bold', marginBottom: '5px' }}>{s.ticker?.replace('.BK', '')}</div>
-                                <div style={{ color: '#666' }}>{s.confirmations} confirmations</div>
-                                {s.avg_score && <div style={{ fontSize: '11px', color: '#666', marginTop: '3px' }}>Score: {s.avg_score.toFixed(2)}</div>}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      
-                      {(!dashboardSummary.top_combined_buys || dashboardSummary.top_combined_buys.length === 0) && 
-                       (!dashboardSummary.top_combined_sells || dashboardSummary.top_combined_sells.length === 0) && (
-                        <p style={{ color: '#666', fontStyle: 'italic' }}>No strong combined signals found for this universe. Try a different universe or run individual models.</p>
-                      )}
-                    </div>
-                  )}
-                  
-                  {!dashboardSummary && !dashboardLoading && (
-                    <p style={{ color: '#666', fontStyle: 'italic' }}>Click "Refresh" to load dashboard summary</p>
-                  )}
-                </div>
-                
-                <h2>Technical Models</h2>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '15px' }}>
-                  {models.filter(m => m.category === 'Technical').map(m => <ModelCard key={m.id} model={m} result={results[m.id]} running={running === m.id} onRun={() => runModel(m.id)} onPDF={downloadPDF} />)}
-                </div>
-                <h2 style={{ marginTop: '30px' }}>Fundamental Models</h2>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '15px' }}>
-                  {models.filter(m => m.category === 'Fundamental').map(m => <ModelCard key={m.id} model={m} result={results[m.id]} running={running === m.id} onRun={() => runModel(m.id)} onPDF={downloadPDF} />)}
-                </div>
-              </>
-            )}
-          </>
-        )}
+        {/* Connection Warning */}
+        {!connected && <div style={{ ...S.card, background: '#fff3cd', borderLeft: '4px solid #ffc107' }}><h3>⚠️ Backend Not Connected</h3><p>Make sure the backend is running and accessible.</p></div>}
 
         {/* HISTORY */}
         {tab === 'history' && (
