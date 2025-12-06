@@ -34,11 +34,17 @@ class Settings(BaseSettings):
         super().__init__(**kwargs)
         # Override CORS origins from environment if provided
         cors_env = os.getenv("CORS_ORIGINS")
-        if cors_env:
+        if cors_env and cors_env.strip():
             try:
                 import json
-                self.cors_origins = json.loads(cors_env)
-            except (json.JSONDecodeError, ValueError):
+                # Try to parse as JSON first
+                parsed = json.loads(cors_env)
+                if isinstance(parsed, list):
+                    self.cors_origins = parsed
+                else:
+                    # If it's a string, treat as comma-separated
+                    self.cors_origins = [origin.strip() for origin in cors_env.split(",") if origin.strip()]
+            except (json.JSONDecodeError, ValueError, TypeError):
                 # If not valid JSON, treat as comma-separated
                 self.cors_origins = [origin.strip() for origin in cors_env.split(",") if origin.strip()]
         
