@@ -55,6 +55,12 @@ class EVEBITDAModel(FundamentalModel):
     def calculate_ev_ebitda(self, fundamental_data: dict) -> Optional[float]:
         """Calculate EV/EBITDA ratio"""
         try:
+            # First try to use pre-calculated EV/EBITDA from yfinance
+            ev_to_ebitda = fundamental_data.get('ev_to_ebitda')
+            if ev_to_ebitda and ev_to_ebitda > 0:
+                return ev_to_ebitda
+            
+            # Fallback: calculate manually
             # Get market cap
             market_cap = fundamental_data.get('market_cap', 0)
             if not market_cap or market_cap <= 0:
@@ -64,8 +70,10 @@ class EVEBITDAModel(FundamentalModel):
             total_debt = fundamental_data.get('total_debt', 0) or 0
             cash = fundamental_data.get('total_cash', 0) or 0
             
-            # Calculate Enterprise Value
-            ev = market_cap + total_debt - cash
+            # Calculate Enterprise Value (or use pre-calculated)
+            ev = fundamental_data.get('enterprise_value')
+            if not ev or ev <= 0:
+                ev = market_cap + total_debt - cash
             
             # Get EBITDA
             ebitda = fundamental_data.get('ebitda', 0)
@@ -79,8 +87,14 @@ class EVEBITDAModel(FundamentalModel):
     def calculate_ebitda_margin(self, fundamental_data: dict) -> Optional[float]:
         """Calculate EBITDA margin"""
         try:
+            # First try pre-calculated margin from yfinance (as decimal 0-1)
+            ebitda_margins = fundamental_data.get('ebitda_margins')
+            if ebitda_margins and ebitda_margins > 0:
+                return ebitda_margins * 100  # Convert to percentage
+            
+            # Fallback: calculate manually
             ebitda = fundamental_data.get('ebitda', 0)
-            revenue = fundamental_data.get('revenue', 0)
+            revenue = fundamental_data.get('total_revenue', 0)
             
             if not revenue or revenue <= 0 or not ebitda:
                 return None

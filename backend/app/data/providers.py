@@ -119,6 +119,20 @@ class YahooFinanceProvider(DataProvider):
                 "ps_ratio": info.get('priceToSalesTrailing12Months'),
                 "peg_ratio": info.get('pegRatio'),
                 
+                # Enterprise Value metrics (for EV/EBITDA model)
+                "enterprise_value": info.get('enterpriseValue'),
+                "ev_to_ebitda": info.get('enterpriseToEbitda'),
+                "ev_to_revenue": info.get('enterpriseToRevenue'),
+                
+                # EBITDA and Cash Flow (for EV/EBITDA and FCF models)
+                "ebitda": info.get('ebitda'),
+                "ebitda_margins": info.get('ebitdaMargins'),
+                "total_revenue": info.get('totalRevenue'),
+                "total_debt": info.get('totalDebt'),
+                "total_cash": info.get('totalCash'),
+                "free_cash_flow": info.get('freeCashflow'),
+                "operating_cash_flow": info.get('operatingCashflow'),
+                
                 # Profitability
                 "roe": info.get('returnOnEquity'),
                 "roa": info.get('returnOnAssets'),

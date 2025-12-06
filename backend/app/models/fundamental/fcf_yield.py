@@ -77,7 +77,7 @@ class FCFYieldModel(FundamentalModel):
         """Calculate FCF Margin = FCF / Revenue * 100"""
         try:
             fcf = fundamental_data.get('free_cash_flow', 0)
-            revenue = fundamental_data.get('revenue', 0)
+            revenue = fundamental_data.get('total_revenue', 0)  # Use correct field name
             
             if not revenue or revenue <= 0:
                 return None
