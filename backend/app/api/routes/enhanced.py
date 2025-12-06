@@ -12,7 +12,7 @@ from datetime import datetime
 import logging
 
 from app.data.fetcher import get_fetcher
-from app.data.universes import get_tickers
+from app.data.universe import get_tickers
 from app.services.enhanced_combiner import (
     EnhancedSignalCombiner, CombineMethod, get_enhanced_combiner, reset_enhanced_combiner
 )

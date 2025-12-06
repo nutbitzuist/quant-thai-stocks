@@ -8,6 +8,7 @@ pydantic-settings>=2.1.0
 yfinance>=0.2.36  # Primary data source (Yahoo Finance)
 pandas>=2.1.0
 numpy>=1.26.0
+scipy>=1.11.0  # Statistical functions for model validation
 
 # Optional Data Providers (install as needed for better data quality/redundancy)
 # Uncomment the ones you want to use:
