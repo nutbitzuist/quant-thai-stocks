@@ -1,3 +1,5 @@
+import './globals.css'
+
 export const metadata = {
   title: 'Quant Stock Analysis',
   description: 'Quantitative analysis platform for US and Thai stocks',
@@ -10,7 +12,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body style={{ margin: 0, padding: 0 }}>{children}</body>
+      <body>{children}</body>
     </html>
   )
 }

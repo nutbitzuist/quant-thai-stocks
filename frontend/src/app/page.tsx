@@ -44,13 +44,81 @@ interface BacktestResult {
 }
 
 const S = {
-  card: { background: 'white', borderRadius: '8px', padding: '20px', marginBottom: '15px', boxShadow: '0 2px 4px rgba(0,0,0,0.08)' } as React.CSSProperties,
-  btn: (v: string) => ({ padding: '8px 16px', background: v === 'primary' ? '#4a90d9' : v === 'success' ? '#28a745' : v === 'danger' ? '#dc3545' : '#e0e0e0', color: v === 'primary' || v === 'success' || v === 'danger' ? 'white' : '#333', border: 'none', borderRadius: '5px', cursor: 'pointer', marginRight: '8px', fontSize: '13px' }),
-  select: { padding: '8px 12px', borderRadius: '5px', border: '1px solid #ddd', marginRight: '10px', fontSize: '13px' } as React.CSSProperties,
-  tab: (a: boolean) => ({ padding: '8px 16px', background: a ? '#4a90d9' : 'transparent', color: a ? 'white' : '#666', border: 'none', borderRadius: '5px', cursor: 'pointer', fontWeight: a ? 'bold' : 'normal' as const, fontSize: '14px' }),
-  dot: (ok: boolean) => ({ width: '10px', height: '10px', borderRadius: '50%', background: ok ? '#28a745' : '#dc3545', display: 'inline-block', marginRight: '8px' }),
-  input: { padding: '8px 12px', borderRadius: '5px', border: '1px solid #ddd', width: '100%', marginBottom: '10px', fontSize: '13px' } as React.CSSProperties,
-  textarea: { padding: '8px 12px', borderRadius: '5px', border: '1px solid #ddd', width: '100%', minHeight: '100px', marginBottom: '10px', fontSize: '13px', fontFamily: 'monospace' } as React.CSSProperties,
+  card: { 
+    background: 'var(--card)', 
+    color: 'var(--card-foreground)',
+    borderRadius: 'var(--radius)', 
+    padding: '1.25rem', 
+    marginBottom: '1rem', 
+    boxShadow: 'var(--shadow-sm)',
+    border: '1px solid var(--border)'
+  } as React.CSSProperties,
+  btn: (v: string) => ({ 
+    padding: '0.5rem 1rem', 
+    background: v === 'primary' ? 'var(--primary)' : v === 'success' ? '#22c55e' : v === 'danger' ? 'var(--destructive)' : 'var(--secondary)', 
+    color: v === 'primary' || v === 'success' || v === 'danger' ? 'var(--primary-foreground)' : 'var(--secondary-foreground)', 
+    border: 'none', 
+    borderRadius: 'var(--radius)', 
+    cursor: 'pointer', 
+    marginRight: '0.5rem', 
+    fontSize: '0.875rem',
+    fontWeight: '500',
+    transition: 'all 0.2s ease',
+    boxShadow: 'var(--shadow-xs)'
+  } as React.CSSProperties),
+  select: { 
+    padding: '0.5rem 0.75rem', 
+    borderRadius: 'var(--radius)', 
+    border: '1px solid var(--input)', 
+    marginRight: '0.625rem', 
+    fontSize: '0.875rem',
+    background: 'var(--background)',
+    color: 'var(--foreground)'
+  } as React.CSSProperties,
+  tab: (a: boolean) => ({ 
+    padding: '0.5rem 1rem', 
+    background: a ? 'var(--primary)' : 'transparent', 
+    color: a ? 'var(--primary-foreground)' : 'var(--muted-foreground)', 
+    border: 'none', 
+    borderRadius: 'var(--radius)', 
+    cursor: 'pointer', 
+    fontWeight: a ? '600' : 'normal' as const, 
+    fontSize: '0.875rem',
+    transition: 'all 0.2s ease'
+  } as React.CSSProperties),
+  dot: (ok: boolean) => ({ 
+    width: '10px', 
+    height: '10px', 
+    borderRadius: '50%', 
+    background: ok ? '#22c55e' : 'var(--destructive)', 
+    display: 'inline-block', 
+    marginRight: '0.5rem',
+    boxShadow: 'var(--shadow-xs)'
+  } as React.CSSProperties),
+  input: { 
+    padding: '0.5rem 0.75rem', 
+    borderRadius: 'var(--radius)', 
+    border: '1px solid var(--input)', 
+    width: '100%', 
+    marginBottom: '0.625rem', 
+    fontSize: '0.875rem',
+    background: 'var(--background)',
+    color: 'var(--foreground)',
+    transition: 'border-color 0.2s ease'
+  } as React.CSSProperties,
+  textarea: { 
+    padding: '0.5rem 0.75rem', 
+    borderRadius: 'var(--radius)', 
+    border: '1px solid var(--input)', 
+    width: '100%', 
+    minHeight: '100px', 
+    marginBottom: '0.625rem', 
+    fontSize: '0.875rem', 
+    fontFamily: 'var(--font-mono)',
+    background: 'var(--background)',
+    color: 'var(--foreground)',
+    transition: 'border-color 0.2s ease'
+  } as React.CSSProperties,
 };
 
 export default function Home() {
@@ -585,19 +653,19 @@ export default function Home() {
 
 
   return (
-    <div style={{ fontFamily: 'system-ui', minHeight: '100vh', background: '#f5f5f5' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--background)', color: 'var(--foreground)' }}>
       {/* Header */}
-      <div style={{ background: '#1a1a2e', color: 'white', padding: '15px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div><h1 style={{ margin: 0, fontSize: '20px' }}>📈 Quant Stock Analysis v2</h1></div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+      <div style={{ background: 'var(--card)', borderBottom: '1px solid var(--border)', padding: '1rem 1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: 'var(--shadow-sm)' }}>
+        <div><h1 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '600', color: 'var(--foreground)' }}>📈 Quant Stock Analysis v2</h1></div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <span style={S.dot(connected)} />
-          <select style={{ ...S.select, background: 'white' }} value={universe} onChange={e => setUniverse(e.target.value)}>
+          <select style={{ ...S.select, background: 'var(--background)' }} value={universe} onChange={e => setUniverse(e.target.value)}>
             <optgroup label="Built-in">{universes.map(u => <option key={u.id} value={u.id}>{u.name} ({u.count})</option>)}</optgroup>
             {customUniverses.length > 0 && <optgroup label="Custom">{customUniverses.map(u => <option key={u.id} value={u.id}>{u.name} ({u.count})</option>)}</optgroup>}
           </select>
-          <label style={{ fontSize: '12px', color: 'white', display: 'flex', alignItems: 'center', gap: '5px' }}>
+          <label style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             Top N:
-            <select style={{ ...S.select, background: 'white', padding: '4px 8px', fontSize: '12px' }} value={topN} onChange={e => setTopN(Number(e.target.value))}>
+            <select style={{ ...S.select, background: 'var(--background)', padding: '0.25rem 0.5rem', fontSize: '0.75rem' }} value={topN} onChange={e => setTopN(Number(e.target.value))}>
               <option value={5}>5</option>
               <option value={10}>10</option>
               <option value={20}>20</option>
@@ -609,7 +677,7 @@ export default function Home() {
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: '5px', background: '#fff', padding: '10px 20px', borderBottom: '1px solid #e0e0e0', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: '0.5rem', background: 'var(--card)', padding: '0.75rem 1.25rem', borderBottom: '1px solid var(--border)', flexWrap: 'wrap' }}>
         {(['history', 'models', 'universe', 'backtest', 'advanced', 'status'] as const).map(t => (
           <button key={t} style={S.tab(tab === t)} onClick={() => setTab(t)}>
             {t === 'history' ? '📜 History' : t === 'models' ? '📚 Models' : t === 'universe' ? '🌐 Universe' : t === 'backtest' ? '📊 Backtest' : t === 'advanced' ? '⚡ Advanced' : '🔧 Status'}
@@ -617,9 +685,9 @@ export default function Home() {
         ))}
       </div>
 
-      <div style={{ padding: '20px' }}>
+      <div style={{ padding: '1.25rem', maxWidth: '1400px', margin: '0 auto' }}>
         {/* Connection Warning */}
-        {!connected && <div style={{ ...S.card, background: '#fff3cd', borderLeft: '4px solid #ffc107' }}><h3>⚠️ Backend Not Connected</h3><p>Make sure the backend is running and accessible.</p></div>}
+        {!connected && <div style={{ ...S.card, background: 'var(--accent)', borderLeft: '4px solid var(--primary)', color: 'var(--accent-foreground)' }}><h3 style={{ margin: '0 0 0.5rem 0' }}>⚠️ Backend Not Connected</h3><p style={{ margin: 0 }}>Make sure the backend is running and accessible.</p></div>}
 
         {/* HISTORY */}
         {tab === 'history' && (
@@ -635,15 +703,15 @@ export default function Home() {
             </div>
             {history.length === 0 ? <p>No runs yet.</p> : (
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                <thead><tr style={{ background: '#f8f9fa' }}><th style={{ padding: '10px', textAlign: 'left' }}>Time</th><th>Model</th><th>Universe</th><th>Buy</th><th>Sell</th><th>Actions</th></tr></thead>
+                <thead><tr style={{ background: 'var(--muted)' }}><th style={{ padding: '10px', textAlign: 'left', color: 'var(--muted-foreground)' }}>Time</th><th style={{ color: 'var(--muted-foreground)' }}>Model</th><th style={{ color: 'var(--muted-foreground)' }}>Universe</th><th style={{ color: 'var(--muted-foreground)' }}>Buy</th><th style={{ color: 'var(--muted-foreground)' }}>Sell</th><th style={{ color: 'var(--muted-foreground)' }}>Actions</th></tr></thead>
                 <tbody>
                   {history.map(r => (
-                    <tr key={r.id} style={{ borderBottom: '1px solid #eee' }}>
+                    <tr key={r.id} style={{ borderBottom: '1px solid var(--border)' }}>
                       <td style={{ padding: '10px' }}>{new Date(r.run_timestamp).toLocaleString()}</td>
                       <td style={{ padding: '10px', fontWeight: 'bold' }}>{r.model_name}</td>
                       <td>{r.universe}</td>
-                      <td style={{ textAlign: 'center', color: '#28a745' }}>{r.buy_signals?.length || 0}</td>
-                      <td style={{ textAlign: 'center', color: '#dc3545' }}>{r.sell_signals?.length || 0}</td>
+                      <td style={{ textAlign: 'center', color: '#22c55e' }}>{r.buy_signals?.length || 0}</td>
+                      <td style={{ textAlign: 'center', color: 'var(--destructive)' }}>{r.sell_signals?.length || 0}</td>
                       <td style={{ textAlign: 'center' }}><button style={S.btn('primary')} onClick={() => downloadPDF(r.id)}>📄 PDF</button></td>
                     </tr>
                   ))}
@@ -656,7 +724,7 @@ export default function Home() {
         {/* MODELS */}
         {tab === 'models' && (
           <>
-            {!connected && <div style={{ ...S.card, background: '#fff3cd', borderLeft: '4px solid #ffc107' }}><h3>⚠️ Backend Not Connected</h3><p>Make sure the backend is running and accessible.</p></div>}
+            {!connected && <div style={{ ...S.card, background: 'var(--accent)', borderLeft: '4px solid var(--primary)', color: 'var(--accent-foreground)' }}><h3 style={{ margin: '0 0 0.5rem 0' }}>⚠️ Backend Not Connected</h3><p style={{ margin: 0 }}>Make sure the backend is running and accessible.</p></div>}
             {connected && (
               <>
                 <h2>Technical Models</h2>
@@ -691,7 +759,7 @@ export default function Home() {
               </div>
               
               {parsePreview && (
-                <div style={{ padding: '10px', background: '#e3f2fd', borderRadius: '5px', fontSize: '12px', marginTop: '10px' }}>
+                <div style={{ padding: '10px', background: 'var(--accent)', color: 'var(--accent-foreground)', borderRadius: 'var(--radius)', fontSize: '12px', marginTop: '10px' }}>
                   <strong>Preview:</strong> {parsePreview.tickers?.length || 0} tickers found
                   {parsePreview.tickers && parsePreview.tickers.length > 0 && (
                     <div style={{ marginTop: '5px', maxHeight: '100px', overflowY: 'auto' }}>
@@ -706,7 +774,7 @@ export default function Home() {
               <h3 style={{ marginTop: 0 }}>Available Universes</h3>
               <h4>Built-in</h4>
               {universes.map(u => (
-                <div key={u.id} style={{ padding: '8px', borderBottom: '1px solid #eee', cursor: 'pointer' }} onClick={() => loadUniverseDetails(u.id)}>
+                <div key={u.id} style={{ padding: '8px', borderBottom: '1px solid var(--border)', cursor: 'pointer' }} onClick={() => loadUniverseDetails(u.id)}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div><b>{u.name}</b> ({u.count} stocks) - {u.market}</div>
                     <button style={{ ...S.btn('secondary'), fontSize: '11px', padding: '4px 8px' }} onClick={(e) => { e.stopPropagation(); loadUniverseDetails(u.id); }}>
@@ -717,10 +785,10 @@ export default function Home() {
               ))}
               <h4 style={{ marginTop: '20px' }}>Custom</h4>
               {customUniverses.length === 0 ? (
-                <p style={{ color: '#666' }}>No custom universes yet</p>
+                <p style={{ color: 'var(--muted-foreground)' }}>No custom universes yet</p>
               ) : (
                 customUniverses.map(u => (
-                  <div key={u.id} style={{ padding: '8px', borderBottom: '1px solid #eee' }}>
+                  <div key={u.id} style={{ padding: '8px', borderBottom: '1px solid var(--border)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div><b>{u.name}</b> ({u.count} stocks) - {u.description}</div>
                       <div style={{ display: 'flex', gap: '5px' }}>
@@ -757,9 +825,9 @@ export default function Home() {
                     <h4>Stocks in Universe ({universeStocks.length})</h4>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '10px', maxHeight: '400px', overflowY: 'auto' }}>
                       {universeStocks.map((stock: any, i: number) => (
-                        <div key={i} style={{ padding: '8px', background: '#f8f9fa', borderRadius: '5px', cursor: 'pointer' }} onClick={() => loadStockDetails(stock.ticker)}>
+                        <div key={i} style={{ padding: '8px', background: 'var(--muted)', borderRadius: 'var(--radius)', cursor: 'pointer', transition: 'background 0.2s ease' }} onMouseEnter={(e) => e.currentTarget.style.background = 'var(--accent)'} onMouseLeave={(e) => e.currentTarget.style.background = 'var(--muted)'} onClick={() => loadStockDetails(stock.ticker)}>
                           <div style={{ fontWeight: 'bold' }}>{stock.ticker?.replace('.BK', '')}</div>
-                          <div style={{ fontSize: '11px', color: '#666' }}>{stock.name || stock.sector || ''}</div>
+                          <div style={{ fontSize: '11px', color: 'var(--muted-foreground)' }}>{stock.name || stock.sector || ''}</div>
                         </div>
                       ))}
                     </div>
@@ -780,8 +848,8 @@ export default function Home() {
                 {stockDetails && (
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px' }}>
                     {Object.entries(stockDetails).map(([key, value]: [string, any]) => (
-                      <div key={key} style={{ padding: '10px', background: '#f8f9fa', borderRadius: '5px' }}>
-                        <div style={{ fontSize: '11px', color: '#666', marginBottom: '5px' }}>{key.replace(/_/g, ' ').toUpperCase()}</div>
+                      <div key={key} style={{ padding: '10px', background: 'var(--muted)', borderRadius: 'var(--radius)' }}>
+                        <div style={{ fontSize: '11px', color: 'var(--muted-foreground)', marginBottom: '5px' }}>{key.replace(/_/g, ' ').toUpperCase()}</div>
                         <div style={{ fontWeight: 'bold' }}>{value || 'N/A'}</div>
                       </div>
                     ))}
@@ -792,7 +860,7 @@ export default function Home() {
             
             {/* Edit Custom Universe Modal */}
             {editingUniverse && (
-              <div style={{ ...S.card, gridColumn: '1 / -1', background: '#fff', border: '2px solid #4a90d9' }}>
+              <div style={{ ...S.card, gridColumn: '1 / -1', background: 'var(--card)', border: '2px solid var(--primary)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
                   <h3 style={{ margin: 0 }}>Edit Universe: {editingUniverse.name}</h3>
                   <button style={{ ...S.btn('secondary'), fontSize: '12px', padding: '6px 12px' }} onClick={() => setEditingUniverse(null)}>
@@ -839,7 +907,7 @@ export default function Home() {
           <>
             <div style={S.card}>
               <h2 style={{ marginTop: 0 }}>📊 Model Backtesting</h2>
-              <p style={{ color: '#666', marginBottom: '20px' }}>Test model performance on historical data to identify which models actually work.</p>
+              <p style={{ color: 'var(--muted-foreground)', marginBottom: '20px' }}>Test model performance on historical data to identify which models actually work.</p>
               
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
                 <div>
@@ -921,7 +989,7 @@ export default function Home() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '15px' }}>
                   <div>
                     <h3 style={{ marginTop: 0 }}>📈 Backtest Results: {backtestResults.model_name}</h3>
-                    <p style={{ color: '#666', fontSize: '12px', margin: 0 }}>Period: {backtestResults.period}</p>
+                    <p style={{ color: 'var(--muted-foreground)', fontSize: '12px', margin: 0 }}>Period: {backtestResults.period}</p>
                   </div>
                   <div style={{ display: 'flex', gap: '10px' }}>
                     <button 
@@ -941,36 +1009,36 @@ export default function Home() {
                 
                 {/* Performance Metrics */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px', marginBottom: '30px' }}>
-                  <div style={{ background: '#f8f9fa', padding: '15px', borderRadius: '8px' }}>
-                    <div style={{ fontSize: '11px', color: '#666', marginBottom: '5px' }}>Total Return</div>
-                    <div style={{ fontSize: '24px', fontWeight: 'bold', color: backtestResults.performance.total_return_pct >= 0 ? '#28a745' : '#dc3545' }}>
+                  <div style={{ background: 'var(--muted)', padding: '15px', borderRadius: 'var(--radius)' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--muted-foreground)', marginBottom: '5px' }}>Total Return</div>
+                    <div style={{ fontSize: '24px', fontWeight: 'bold', color: backtestResults.performance.total_return_pct >= 0 ? '#22c55e' : 'var(--destructive)' }}>
                       {backtestResults.performance.total_return_pct >= 0 ? '+' : ''}{backtestResults.performance.total_return_pct.toFixed(2)}%
                     </div>
                   </div>
                   
-                  <div style={{ background: '#f8f9fa', padding: '15px', borderRadius: '8px' }}>
-                    <div style={{ fontSize: '11px', color: '#666', marginBottom: '5px' }}>Annualized Return</div>
-                    <div style={{ fontSize: '24px', fontWeight: 'bold', color: backtestResults.performance.annualized_return_pct >= 0 ? '#28a745' : '#dc3545' }}>
+                  <div style={{ background: 'var(--muted)', padding: '15px', borderRadius: 'var(--radius)' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--muted-foreground)', marginBottom: '5px' }}>Annualized Return</div>
+                    <div style={{ fontSize: '24px', fontWeight: 'bold', color: backtestResults.performance.annualized_return_pct >= 0 ? '#22c55e' : 'var(--destructive)' }}>
                       {backtestResults.performance.annualized_return_pct >= 0 ? '+' : ''}{backtestResults.performance.annualized_return_pct.toFixed(2)}%
                     </div>
                   </div>
                   
-                  <div style={{ background: '#f8f9fa', padding: '15px', borderRadius: '8px' }}>
-                    <div style={{ fontSize: '11px', color: '#666', marginBottom: '5px' }}>Sharpe Ratio</div>
-                    <div style={{ fontSize: '24px', fontWeight: 'bold', color: backtestResults.performance.sharpe_ratio >= 1 ? '#28a745' : backtestResults.performance.sharpe_ratio >= 0.5 ? '#ffc107' : '#dc3545' }}>
+                  <div style={{ background: 'var(--muted)', padding: '15px', borderRadius: 'var(--radius)' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--muted-foreground)', marginBottom: '5px' }}>Sharpe Ratio</div>
+                    <div style={{ fontSize: '24px', fontWeight: 'bold', color: backtestResults.performance.sharpe_ratio >= 1 ? '#22c55e' : backtestResults.performance.sharpe_ratio >= 0.5 ? '#f59e0b' : 'var(--destructive)' }}>
                       {backtestResults.performance.sharpe_ratio.toFixed(2)}
                     </div>
                   </div>
                   
-                  <div style={{ background: '#f8f9fa', padding: '15px', borderRadius: '8px' }}>
-                    <div style={{ fontSize: '11px', color: '#666', marginBottom: '5px' }}>Max Drawdown</div>
-                    <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#dc3545' }}>
+                  <div style={{ background: 'var(--muted)', padding: '15px', borderRadius: 'var(--radius)' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--muted-foreground)', marginBottom: '5px' }}>Max Drawdown</div>
+                    <div style={{ fontSize: '24px', fontWeight: 'bold', color: 'var(--destructive)' }}>
                       {backtestResults.performance.max_drawdown_pct.toFixed(2)}%
                     </div>
                   </div>
                   
-                  <div style={{ background: '#f8f9fa', padding: '15px', borderRadius: '8px' }}>
-                    <div style={{ fontSize: '11px', color: '#666', marginBottom: '5px' }}>Final Value</div>
+                  <div style={{ background: 'var(--muted)', padding: '15px', borderRadius: 'var(--radius)' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--muted-foreground)', marginBottom: '5px' }}>Final Value</div>
                     <div style={{ fontSize: '24px', fontWeight: 'bold' }}>
                       ${backtestResults.performance.final_value.toLocaleString()}
                     </div>
@@ -981,38 +1049,38 @@ export default function Home() {
                 <h4 style={{ marginTop: '30px', marginBottom: '15px' }}>Trade Statistics</h4>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '15px', marginBottom: '30px' }}>
                   <div>
-                    <div style={{ fontSize: '12px', color: '#666' }}>Total Trades</div>
+                    <div style={{ fontSize: '12px', color: 'var(--muted-foreground)' }}>Total Trades</div>
                     <div style={{ fontSize: '18px', fontWeight: 'bold' }}>{backtestResults.trades.total}</div>
                   </div>
                   <div>
-                    <div style={{ fontSize: '12px', color: '#666' }}>Win Rate</div>
-                    <div style={{ fontSize: '18px', fontWeight: 'bold', color: backtestResults.trades.win_rate_pct >= 50 ? '#28a745' : '#dc3545' }}>
+                    <div style={{ fontSize: '12px', color: 'var(--muted-foreground)' }}>Win Rate</div>
+                    <div style={{ fontSize: '18px', fontWeight: 'bold', color: backtestResults.trades.win_rate_pct >= 50 ? '#22c55e' : 'var(--destructive)' }}>
                       {backtestResults.trades.win_rate_pct.toFixed(1)}%
                     </div>
                   </div>
                   <div>
                     <div style={{ fontSize: '12px', color: '#666' }}>Winning Trades</div>
-                    <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#28a745' }}>{backtestResults.trades.winning}</div>
+                    <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#22c55e' }}>{backtestResults.trades.winning}</div>
                   </div>
                   <div>
                     <div style={{ fontSize: '12px', color: '#666' }}>Losing Trades</div>
-                    <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#dc3545' }}>{backtestResults.trades.losing}</div>
+                    <div style={{ fontSize: '18px', fontWeight: 'bold', color: 'var(--destructive)' }}>{backtestResults.trades.losing}</div>
                   </div>
                   <div>
                     <div style={{ fontSize: '12px', color: '#666' }}>Avg Win</div>
-                    <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#28a745' }}>
+                    <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#22c55e' }}>
                       +{backtestResults.trades.avg_win_pct.toFixed(2)}%
                     </div>
                   </div>
                   <div>
-                    <div style={{ fontSize: '12px', color: '#666' }}>Avg Loss</div>
-                    <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#dc3545' }}>
+                    <div style={{ fontSize: '12px', color: 'var(--muted-foreground)' }}>Avg Loss</div>
+                    <div style={{ fontSize: '18px', fontWeight: 'bold', color: 'var(--destructive)' }}>
                       {backtestResults.trades.avg_loss_pct.toFixed(2)}%
                     </div>
                   </div>
                   <div>
                     <div style={{ fontSize: '12px', color: '#666' }}>Profit Factor</div>
-                    <div style={{ fontSize: '18px', fontWeight: 'bold', color: backtestResults.trades.profit_factor >= 1.5 ? '#28a745' : backtestResults.trades.profit_factor >= 1 ? '#ffc107' : '#dc3545' }}>
+                    <div style={{ fontSize: '18px', fontWeight: 'bold', color: backtestResults.trades.profit_factor >= 1.5 ? '#22c55e' : backtestResults.trades.profit_factor >= 1 ? '#f59e0b' : 'var(--destructive)' }}>
                       {backtestResults.trades.profit_factor.toFixed(2)}
                     </div>
                   </div>
@@ -1043,10 +1111,10 @@ export default function Home() {
                               <td style={{ padding: '8px', fontWeight: 'bold' }}>{trade.ticker.replace('.BK', '')}</td>
                               <td style={{ padding: '8px', textAlign: 'right' }}>${trade.entry_price.toFixed(2)}</td>
                               <td style={{ padding: '8px', textAlign: 'right' }}>${trade.exit_price.toFixed(2)}</td>
-                              <td style={{ padding: '8px', textAlign: 'right', color: trade.return_pct >= 0 ? '#28a745' : '#dc3545', fontWeight: 'bold' }}>
+                              <td style={{ padding: '8px', textAlign: 'right', color: trade.return_pct >= 0 ? '#22c55e' : 'var(--destructive)', fontWeight: 'bold' }}>
                                 {trade.return_pct >= 0 ? '+' : ''}{trade.return_pct.toFixed(2)}%
                               </td>
-                              <td style={{ padding: '8px', textAlign: 'right', color: trade.pnl >= 0 ? '#28a745' : '#dc3545', fontWeight: 'bold' }}>
+                              <td style={{ padding: '8px', textAlign: 'right', color: trade.pnl >= 0 ? '#22c55e' : 'var(--destructive)', fontWeight: 'bold' }}>
                                 {trade.pnl >= 0 ? '+' : ''}${trade.pnl.toFixed(2)}
                               </td>
                             </tr>
@@ -1067,7 +1135,7 @@ export default function Home() {
             {/* Signal Combiner */}
             <div style={S.card}>
               <h2 style={{ marginTop: 0 }}>🔗 Signal Combiner</h2>
-              <p style={{ color: '#666', marginBottom: '20px' }}>Run multiple models and find stocks with confirmation from multiple signals. Higher confidence = better signals.</p>
+              <p style={{ color: 'var(--muted-foreground)', marginBottom: '20px' }}>Run multiple models and find stocks with confirmation from multiple signals. Higher confidence = better signals.</p>
               
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '15px', marginBottom: '20px' }}>
                 <div>
@@ -1081,7 +1149,7 @@ export default function Home() {
                 <div>
                   <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', fontWeight: 'bold' }}>Min Confirmation</label>
                   <input type="number" style={S.input} value={signalCombinerMinConf} onChange={e => setSignalCombinerMinConf(Number(e.target.value))} min={1} max={20} />
-                  <small style={{ color: '#666', fontSize: '11px' }}>How many models must agree</small>
+                  <small style={{ color: 'var(--muted-foreground)', fontSize: '11px' }}>How many models must agree</small>
                 </div>
                 
                 <div>
@@ -1109,12 +1177,12 @@ export default function Home() {
                   
                   {signalCombinerResults.strong_buy_signals && signalCombinerResults.strong_buy_signals.length > 0 && (
                     <div style={{ marginBottom: '20px' }}>
-                      <h5 style={{ color: '#28a745', marginBottom: '10px' }}>🟢 Strong Buy Signals ({signalCombinerResults.strong_buy_signals.length})</h5>
+                      <h5 style={{ color: '#22c55e', marginBottom: '10px' }}>🟢 Strong Buy Signals ({signalCombinerResults.strong_buy_signals.length})</h5>
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '10px' }}>
                         {signalCombinerResults.strong_buy_signals.map((s: any, i: number) => (
                           <div key={i} style={{ background: 'white', padding: '10px', borderRadius: '5px', fontSize: '12px' }}>
                             <div style={{ fontWeight: 'bold', marginBottom: '5px' }}>{s.ticker.replace('.BK', '')}</div>
-                            <div style={{ color: '#666' }}>{s.confirmations} confirmations • Score: {s.avg_score}</div>
+                            <div style={{ color: 'var(--muted-foreground)' }}>{s.confirmations} confirmations • Score: {s.avg_score}</div>
                             <div style={{ fontSize: '11px', color: '#999', marginTop: '3px' }}>{s.models?.join(', ')}</div>
                           </div>
                         ))}
@@ -1129,7 +1197,7 @@ export default function Home() {
                         {signalCombinerResults.moderate_buy_signals.slice(0, 10).map((s: any, i: number) => (
                           <div key={i} style={{ background: 'white', padding: '10px', borderRadius: '5px', fontSize: '12px' }}>
                             <div style={{ fontWeight: 'bold', marginBottom: '5px' }}>{s.ticker.replace('.BK', '')}</div>
-                            <div style={{ color: '#666' }}>{s.confirmations} confirmations • Score: {s.avg_score}</div>
+                            <div style={{ color: 'var(--muted-foreground)' }}>{s.confirmations} confirmations • Score: {s.avg_score}</div>
                           </div>
                         ))}
                       </div>
@@ -1138,12 +1206,12 @@ export default function Home() {
                   
                   {signalCombinerResults.strong_sell_signals && signalCombinerResults.strong_sell_signals.length > 0 && (
                     <div>
-                      <h5 style={{ color: '#dc3545', marginBottom: '10px' }}>🔴 Strong Sell Signals ({signalCombinerResults.strong_sell_signals.length})</h5>
+                      <h5 style={{ color: 'var(--destructive)', marginBottom: '10px' }}>🔴 Strong Sell Signals ({signalCombinerResults.strong_sell_signals.length})</h5>
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '10px' }}>
                         {signalCombinerResults.strong_sell_signals.map((s: any, i: number) => (
                           <div key={i} style={{ background: 'white', padding: '10px', borderRadius: '5px', fontSize: '12px' }}>
                             <div style={{ fontWeight: 'bold', marginBottom: '5px' }}>{s.ticker.replace('.BK', '')}</div>
-                            <div style={{ color: '#666' }}>{s.confirmations} confirmations • Score: {s.avg_score}</div>
+                            <div style={{ color: 'var(--muted-foreground)' }}>{s.confirmations} confirmations • Score: {s.avg_score}</div>
                             <div style={{ fontSize: '11px', color: '#999', marginTop: '3px' }}>{s.models?.join(', ')}</div>
                           </div>
                         ))}
@@ -1154,7 +1222,7 @@ export default function Home() {
                   {(!signalCombinerResults.strong_buy_signals || signalCombinerResults.strong_buy_signals.length === 0) && 
                    (!signalCombinerResults.moderate_buy_signals || signalCombinerResults.moderate_buy_signals.length === 0) &&
                    (!signalCombinerResults.strong_sell_signals || signalCombinerResults.strong_sell_signals.length === 0) && (
-                    <p style={{ color: '#666', fontStyle: 'italic' }}>No signals found with the specified confirmation threshold. Try lowering the minimum confirmation.</p>
+                    <p style={{ color: 'var(--muted-foreground)', fontStyle: 'italic' }}>No signals found with the specified confirmation threshold. Try lowering the minimum confirmation.</p>
                   )}
                 </div>
               )}
@@ -1163,7 +1231,7 @@ export default function Home() {
             {/* Sector Rotation */}
             <div style={S.card}>
               <h2 style={{ marginTop: 0 }}>🔄 Sector Rotation</h2>
-              <p style={{ color: '#666', marginBottom: '20px' }}>Identify which sectors are strongest/weakest for rotation strategies.</p>
+              <p style={{ color: 'var(--muted-foreground)', marginBottom: '20px' }}>Identify which sectors are strongest/weakest for rotation strategies.</p>
               
               <div style={{ display: 'flex', gap: '15px', marginBottom: '20px', alignItems: 'flex-end' }}>
                 <div style={{ flex: 1 }}>
@@ -1219,13 +1287,13 @@ export default function Home() {
                                 <td style={{ padding: '8px', fontWeight: 'bold' }}>#{s.rank}</td>
                                 <td style={{ padding: '8px', fontWeight: 'bold' }}>{s.sector}</td>
                                 <td style={{ padding: '8px', textAlign: 'right' }}>{s.momentum_score.toFixed(2)}</td>
-                                <td style={{ padding: '8px', textAlign: 'right', color: s.return_1w >= 0 ? '#28a745' : '#dc3545' }}>
+                                <td style={{ padding: '8px', textAlign: 'right', color: s.return_1w >= 0 ? '#22c55e' : 'var(--destructive)' }}>
                                   {s.return_1w >= 0 ? '+' : ''}{s.return_1w.toFixed(2)}%
                                 </td>
-                                <td style={{ padding: '8px', textAlign: 'right', color: s.return_1m >= 0 ? '#28a745' : '#dc3545' }}>
+                                <td style={{ padding: '8px', textAlign: 'right', color: s.return_1m >= 0 ? '#22c55e' : 'var(--destructive)' }}>
                                   {s.return_1m >= 0 ? '+' : ''}{s.return_1m.toFixed(2)}%
                                 </td>
-                                <td style={{ padding: '8px', textAlign: 'right', color: s.return_3m >= 0 ? '#28a745' : '#dc3545' }}>
+                                <td style={{ padding: '8px', textAlign: 'right', color: s.return_3m >= 0 ? '#22c55e' : 'var(--destructive)' }}>
                                   {s.return_3m >= 0 ? '+' : ''}{s.return_3m.toFixed(2)}%
                                 </td>
                                 <td style={{ padding: '8px', textAlign: 'center' }}>
@@ -1295,21 +1363,21 @@ function ModelCard({ model, result, running, onRun, onPDF }: { model: Model; res
   return (
     <div style={S.card}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div><h3 style={{ margin: 0 }}>{model.name}</h3><span style={{ fontSize: '11px', padding: '2px 6px', borderRadius: '3px', background: model.category === 'Technical' ? '#cce5ff' : '#e2d5f1' }}>{model.category}</span></div>
+        <div><h3 style={{ margin: 0 }}>{model.name}</h3><span style={{ fontSize: '11px', padding: '2px 6px', borderRadius: 'var(--radius)', background: model.category === 'Technical' ? 'var(--accent)' : 'var(--muted)', color: model.category === 'Technical' ? 'var(--accent-foreground)' : 'var(--muted-foreground)' }}>{model.category}</span></div>
         <button style={{ ...S.btn('primary'), opacity: running ? 0.6 : 1 }} onClick={onRun} disabled={running}>{running ? '⏳...' : '▶ Run'}</button>
       </div>
-      <p style={{ color: '#666', fontSize: '12px', margin: '10px 0' }}>{model.description}</p>
+      <p style={{ color: 'var(--muted-foreground)', fontSize: '12px', margin: '10px 0' }}>{model.description}</p>
       {result && (
-        <div style={{ borderTop: '1px solid #eee', paddingTop: '10px' }}>
+        <div style={{ borderTop: '1px solid var(--border)', paddingTop: '10px' }}>
           <div style={{ display: 'flex', gap: '10px', marginBottom: '8px', fontSize: '12px', flexWrap: 'wrap' }}>
-            <span style={{ color: '#28a745' }}>✅ {result.buy_signals.length} Buy</span>
-            <span style={{ color: '#dc3545' }}>🔻 {result.sell_signals.length} Sell</span>
-            <span style={{ color: '#666' }}>{result.stocks_with_data}/{result.total_stocks_analyzed} stocks</span>
-            <span style={{ color: '#999', fontSize: '11px', fontStyle: 'italic' }}>(Top signals shown)</span>
+            <span style={{ color: '#22c55e' }}>✅ {result.buy_signals.length} Buy</span>
+            <span style={{ color: 'var(--destructive)' }}>🔻 {result.sell_signals.length} Sell</span>
+            <span style={{ color: 'var(--muted-foreground)' }}>{result.stocks_with_data}/{result.total_stocks_analyzed} stocks</span>
+            <span style={{ color: 'var(--muted-foreground)', fontSize: '11px', fontStyle: 'italic' }}>(Top signals shown)</span>
           </div>
           {result.buy_signals.slice(0, 4).map((s, i) => (
             <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', padding: '3px 0' }}>
-              <b>{s.ticker.replace('.BK', '')}</b><span>${s.price_at_signal.toFixed(2)}</span><span style={{ color: '#28a745' }}>{s.score.toFixed(0)}</span>
+              <b>{s.ticker.replace('.BK', '')}</b><span>${s.price_at_signal.toFixed(2)}</span><span style={{ color: '#22c55e' }}>{s.score.toFixed(0)}</span>
             </div>
           ))}
           <button style={{ ...S.btn('secondary'), marginTop: '8px', fontSize: '11px' }} onClick={() => onPDF(result.run_id)}>📄 Download PDF</button>
