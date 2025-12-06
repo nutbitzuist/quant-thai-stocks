@@ -186,8 +186,9 @@ class MarketRegimeDetector:
                 signals['breadth_positive'] = None
         
         # Count bullish signals (exclude None values)
+        # Use bool(v) instead of v is True to handle numpy.bool_ types
         valid_signals = {k: v for k, v in signals.items() if v is not None}
-        bullish_count = sum(1 for v in valid_signals.values() if v is True)
+        bullish_count = sum(1 for v in valid_signals.values() if bool(v))
         total_signals = len(valid_signals)
         bullish_pct = (bullish_count / total_signals * 100) if total_signals > 0 else 50
         
