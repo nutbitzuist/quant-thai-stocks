@@ -1106,7 +1106,7 @@ export default function Home() {
                         </thead>
                         <tbody>
                           {backtestResults.recent_trades.map((trade, i) => (
-                            <tr key={i} style={{ borderBottom: '1px solid #eee' }}>
+                            <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
                               <td style={{ padding: '8px' }}>{new Date(trade.entry_date).toLocaleDateString()}</td>
                               <td style={{ padding: '8px' }}>{new Date(trade.exit_date).toLocaleDateString()}</td>
                               <td style={{ padding: '8px', fontWeight: 'bold' }}>{trade.ticker.replace('.BK', '')}</td>
@@ -1184,7 +1184,7 @@ export default function Home() {
                           <div key={i} style={{ background: 'white', padding: '10px', borderRadius: '5px', fontSize: '12px' }}>
                             <div style={{ fontWeight: 'bold', marginBottom: '5px' }}>{s.ticker.replace('.BK', '')}</div>
                             <div style={{ color: 'var(--muted-foreground)' }}>{s.confirmations} confirmations • Score: {s.avg_score}</div>
-                            <div style={{ fontSize: '11px', color: '#999', marginTop: '3px' }}>{s.models?.join(', ')}</div>
+                            <div style={{ fontSize: '11px', color: 'var(--muted-foreground)', marginTop: '3px' }}>{s.models?.join(', ')}</div>
                           </div>
                         ))}
                       </div>
@@ -1213,7 +1213,7 @@ export default function Home() {
                           <div key={i} style={{ background: 'white', padding: '10px', borderRadius: '5px', fontSize: '12px' }}>
                             <div style={{ fontWeight: 'bold', marginBottom: '5px' }}>{s.ticker.replace('.BK', '')}</div>
                             <div style={{ color: 'var(--muted-foreground)' }}>{s.confirmations} confirmations • Score: {s.avg_score}</div>
-                            <div style={{ fontSize: '11px', color: '#999', marginTop: '3px' }}>{s.models?.join(', ')}</div>
+                            <div style={{ fontSize: '11px', color: 'var(--muted-foreground)', marginTop: '3px' }}>{s.models?.join(', ')}</div>
                           </div>
                         ))}
                       </div>
@@ -1284,7 +1284,7 @@ export default function Home() {
                           </thead>
                           <tbody>
                             {sectorRotationResults.sector_rankings.map((s: any, i: number) => (
-                              <tr key={i} style={{ borderBottom: '1px solid #eee' }}>
+                              <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
                                 <td style={{ padding: '8px', fontWeight: 'bold' }}>#{s.rank}</td>
                                 <td style={{ padding: '8px', fontWeight: 'bold' }}>{s.sector}</td>
                                 <td style={{ padding: '8px', textAlign: 'right' }}>{s.momentum_score.toFixed(2)}</td>
