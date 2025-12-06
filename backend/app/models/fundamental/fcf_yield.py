@@ -34,19 +34,22 @@ class FCFYieldModel(FundamentalModel):
         require_positive_fcf: bool = True,
         max_capex_ratio: float = 50.0
     ):
-        super().__init__()
-        self.name = "FCF Yield"
-        self.description = "Find stocks with high free cash flow yield - cash generation focus"
         self.min_fcf_yield = min_fcf_yield
         self.min_fcf_margin = min_fcf_margin
         self.require_positive_fcf = require_positive_fcf
         self.max_capex_ratio = max_capex_ratio
-        self.parameters = {
+        
+        params = {
             "min_fcf_yield": min_fcf_yield,
             "min_fcf_margin": min_fcf_margin,
             "require_positive_fcf": require_positive_fcf,
             "max_capex_ratio": max_capex_ratio
         }
+        super().__init__(
+            name="FCF Yield",
+            description="Find stocks with high free cash flow yield - cash generation focus",
+            parameters=params
+        )
     
     def calculate_fcf_yield(self, fundamental_data: dict) -> Optional[float]:
         """Calculate FCF Yield = FCF / Market Cap * 100"""

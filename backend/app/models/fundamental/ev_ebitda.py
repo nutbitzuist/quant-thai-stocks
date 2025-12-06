@@ -33,21 +33,24 @@ class EVEBITDAModel(FundamentalModel):
         prefer_low_debt: bool = True,
         debt_to_ebitda_max: float = 4.0
     ):
-        super().__init__()
-        self.name = "EV/EBITDA Screen"
-        self.description = "Find undervalued stocks using Enterprise Value to EBITDA ratio"
         self.max_ev_ebitda = max_ev_ebitda
         self.min_ev_ebitda = min_ev_ebitda
         self.min_ebitda_margin = min_ebitda_margin
         self.prefer_low_debt = prefer_low_debt
         self.debt_to_ebitda_max = debt_to_ebitda_max
-        self.parameters = {
+        
+        params = {
             "max_ev_ebitda": max_ev_ebitda,
             "min_ev_ebitda": min_ev_ebitda,
             "min_ebitda_margin": min_ebitda_margin,
             "prefer_low_debt": prefer_low_debt,
             "debt_to_ebitda_max": debt_to_ebitda_max
         }
+        super().__init__(
+            name="EV/EBITDA Screen",
+            description="Find undervalued stocks using Enterprise Value to EBITDA ratio",
+            parameters=params
+        )
     
     def calculate_ev_ebitda(self, fundamental_data: dict) -> Optional[float]:
         """Calculate EV/EBITDA ratio"""

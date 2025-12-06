@@ -36,9 +36,6 @@ class MomentumValueModel(FundamentalModel):
         min_momentum_12m: float = 0.0,
         momentum_lookback: int = 252
     ):
-        super().__init__()
-        self.name = "Momentum + Value Combo"
-        self.description = "Factor investing combining value metrics with price momentum"
         self.value_weight = value_weight
         self.momentum_weight = momentum_weight
         self.max_pe = max_pe
@@ -46,7 +43,8 @@ class MomentumValueModel(FundamentalModel):
         self.min_momentum_6m = min_momentum_6m
         self.min_momentum_12m = min_momentum_12m
         self.momentum_lookback = momentum_lookback
-        self.parameters = {
+        
+        params = {
             "value_weight": value_weight,
             "momentum_weight": momentum_weight,
             "max_pe": max_pe,
@@ -55,6 +53,11 @@ class MomentumValueModel(FundamentalModel):
             "min_momentum_12m": min_momentum_12m,
             "momentum_lookback": momentum_lookback
         }
+        super().__init__(
+            name="Momentum + Value Combo",
+            description="Factor investing combining value metrics with price momentum",
+            parameters=params
+        )
     
     def calculate_value_score(self, fundamental_data: dict) -> tuple:
         """Calculate composite value score (0-100)"""
