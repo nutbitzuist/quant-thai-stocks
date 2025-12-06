@@ -653,38 +653,23 @@ export default function Home() {
           </div>
         )}
 
-        {/* MODELS DOCUMENTATION */}
+        {/* MODELS */}
         {tab === 'models' && (
-          <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: '20px' }}>
-            <div style={S.card}>
-              <h3 style={{ marginTop: 0 }}>Models</h3>
-              {Object.entries(modelDocs).map(([id, doc]: [string, any]) => (
-                <div key={id} onClick={() => setSelDoc(id)} style={{ padding: '8px', borderRadius: '5px', cursor: 'pointer', background: selDoc === id ? '#e3f2fd' : 'transparent', marginBottom: '4px' }}>
-                  <div style={{ fontWeight: 'bold', fontSize: '13px' }}>{doc.name}</div>
-                  <div style={{ fontSize: '11px', color: '#666' }}>{doc.category}</div>
+          <>
+            {!connected && <div style={{ ...S.card, background: '#fff3cd', borderLeft: '4px solid #ffc107' }}><h3>⚠️ Backend Not Connected</h3><p>Make sure the backend is running and accessible.</p></div>}
+            {connected && (
+              <>
+                <h2>Technical Models</h2>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '15px', marginBottom: '30px' }}>
+                  {models.filter(m => m.category === 'Technical').map(m => <ModelCard key={m.id} model={m} result={results[m.id]} running={running === m.id} onRun={() => runModel(m.id)} onPDF={downloadPDF} />)}
                 </div>
-              ))}
-            </div>
-            <div style={S.card}>
-              {selDoc && modelDocs[selDoc] ? (
-                <>
-                  <h2 style={{ marginTop: 0 }}>{modelDocs[selDoc].name}</h2>
-                  <span style={{ background: modelDocs[selDoc].category === 'Technical' ? '#cce5ff' : '#e2d5f1', padding: '4px 10px', borderRadius: '4px', fontSize: '12px' }}>{modelDocs[selDoc].category}</span>
-                  <p style={{ marginTop: '15px', fontStyle: 'italic', color: '#666' }}>{modelDocs[selDoc].summary}</p>
-                  <pre style={{ background: '#f8f9fa', padding: '15px', borderRadius: '5px', whiteSpace: 'pre-wrap', fontSize: '13px', lineHeight: 1.6 }}>{modelDocs[selDoc].description}</pre>
-                  {modelDocs[selDoc].parameters && (
-                    <><h4>Parameters</h4>
-                    <table style={{ width: '100%', fontSize: '13px' }}><tbody>
-                      {Object.entries(modelDocs[selDoc].parameters).map(([k, v]: [string, any]) => (
-                        <tr key={k}><td style={{ padding: '5px', fontWeight: 'bold' }}>{k}</td><td>{v.description}</td><td style={{ color: '#666' }}>Default: {v.default}</td></tr>
-                      ))}
-                    </tbody></table></>
-                  )}
-                  {modelDocs[selDoc].references && (<><h4>References</h4><ul>{modelDocs[selDoc].references.map((r: string, i: number) => <li key={i} style={{ fontSize: '13px' }}>{r}</li>)}</ul></>)}
-                </>
-              ) : <p style={{ color: '#666' }}>Select a model to view documentation</p>}
-            </div>
-          </div>
+                <h2 style={{ marginTop: '30px' }}>Fundamental Models</h2>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '15px' }}>
+                  {models.filter(m => m.category === 'Fundamental').map(m => <ModelCard key={m.id} model={m} result={results[m.id]} running={running === m.id} onRun={() => runModel(m.id)} onPDF={downloadPDF} />)}
+                </div>
+              </>
+            )}
+          </>
         )}
 
         {/* UNIVERSE MANAGER */}
