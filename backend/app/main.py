@@ -157,13 +157,14 @@ async def test_fetch(ticker: str):
 
 
 # Import and register routers
-from app.api.routes import models, universe, status, custom_universe, advanced
+from app.api.routes import models, universe, status, custom_universe, advanced, scheduled_scans
 
 app.include_router(models.router, prefix="/api/models", tags=["Models"])
 app.include_router(universe.router, prefix="/api/universe", tags=["Universe"])
 app.include_router(status.router, prefix="/api/status", tags=["Status"])
 app.include_router(custom_universe.router, prefix="/api/custom-universe", tags=["Custom Universe"])
 app.include_router(advanced.router, prefix="/api/advanced", tags=["Advanced Features"])
+app.include_router(scheduled_scans.router, tags=["Scheduled Scans"])
 
 
 if __name__ == "__main__":

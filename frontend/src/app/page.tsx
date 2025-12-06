@@ -7,7 +7,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 // Types
 interface Signal { ticker: string; signal_type: string; score: number; price_at_signal: number; }
-interface Model { id: string; name: string; description: string; category: string; }
+interface Model { id: string; name: string; description: string; category: string; default_parameters?: Record<string, any>; }
 interface ModelResult { run_id: string; model_name: string; category: string; buy_signals: Signal[]; sell_signals: Signal[]; total_stocks_analyzed: number; stocks_with_data: number; }
 interface Log { time: string; type: 'info' | 'error' | 'success'; message: string; }
 interface BacktestResult {
@@ -165,6 +165,19 @@ export default function Home() {
   const [sectorRotationRunning, setSectorRotationRunning] = useState(false);
   const [sectorRotationResults, setSectorRotationResults] = useState<any>(null);
   
+  // Market Regime state
+  const [marketRegimeIndex, setMarketRegimeIndex] = useState('SPY');
+  const [marketRegimeUniverse, setMarketRegimeUniverse] = useState('sp50');
+  const [marketRegimeRunning, setMarketRegimeRunning] = useState(false);
+  const [marketRegimeResults, setMarketRegimeResults] = useState<any>(null);
+  
+  // Scheduled Scans state
+  const [scheduledScans, setScheduledScans] = useState<any[]>([]);
+  const [newScanModel, setNewScanModel] = useState('');
+  const [newScanUniverse, setNewScanUniverse] = useState('sp50');
+  const [newScanTime, setNewScanTime] = useState('09:30');
+  const [newScanDays, setNewScanDays] = useState<string[]>(['Mon', 'Tue', 'Wed', 'Thu', 'Fri']);
+  
   // Universe details state
   const [selectedUniverseId, setSelectedUniverseId] = useState<string | null>(null);
   const [universeDetails, setUniverseDetails] = useState<any>(null);
@@ -210,6 +223,25 @@ export default function Home() {
     try {
       const r = await fetch(`${API_URL}/api/models/run`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model_id: id, universe, top_n: topN }) });
       if (r.ok) { const d = await r.json(); setResults(p => ({ ...p, [id]: d })); log('success', `${d.model_name}: ${d.buy_signals.length} buy, ${d.sell_signals.length} sell (showing top ${topN})`); loadAll(); }
+      else { const e = await r.json(); log('error', e.detail); }
+    } catch(e) { log('error', `${e}`); }
+    setRunning(null);
+  };
+
+  const runModelWithParams = async (id: string, params: Record<string, any>) => {
+    setRunning(id); log('info', `Running ${id} with custom parameters...`);
+    try {
+      const r = await fetch(`${API_URL}/api/models/run`, { 
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json' }, 
+        body: JSON.stringify({ model_id: id, universe, top_n: topN, parameters: params }) 
+      });
+      if (r.ok) { 
+        const d = await r.json(); 
+        setResults(p => ({ ...p, [id]: d })); 
+        log('success', `${d.model_name}: ${d.buy_signals.length} buy, ${d.sell_signals.length} sell (custom params)`); 
+        loadAll(); 
+      }
       else { const e = await r.json(); log('error', e.detail); }
     } catch(e) { log('error', `${e}`); }
     setRunning(null);
@@ -333,6 +365,91 @@ export default function Home() {
       log('error', `Sector rotation error: ${e}`);
     }
     setSectorRotationRunning(false);
+  };
+
+  const runMarketRegime = async () => {
+    setMarketRegimeRunning(true);
+    log('info', 'Detecting market regime...');
+    try {
+      const r = await fetch(`${API_URL}/api/advanced/market-regime?index=${marketRegimeIndex}&universe=${marketRegimeUniverse}`);
+      if (r.ok) {
+        const d = await r.json();
+        setMarketRegimeResults(d);
+        log('success', `Market Regime: ${d.regime} - ${d.recommendation || 'Analysis complete'}`);
+      } else {
+        const e = await r.json();
+        log('error', `Market regime failed: ${e.detail || r.statusText}`);
+      }
+    } catch(e) {
+      log('error', `Market regime error: ${e}`);
+    }
+    setMarketRegimeRunning(false);
+  };
+
+  // Scheduled Scans functions
+  const loadScheduledScans = async () => {
+    try {
+      const r = await fetch(`${API_URL}/api/scheduled-scans/`);
+      if (r.ok) {
+        const d = await r.json();
+        setScheduledScans(d.scans || []);
+      }
+    } catch(e) { /* Scheduled scans endpoint may not exist yet */ }
+  };
+
+  const createScheduledScan = async () => {
+    if (!newScanModel) { log('error', 'Please select a model'); return; }
+    try {
+      const r = await fetch(`${API_URL}/api/scheduled-scans/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model_id: newScanModel,
+          universe: newScanUniverse,
+          schedule_time: newScanTime,
+          days: newScanDays,
+          enabled: true
+        })
+      });
+      if (r.ok) {
+        log('success', 'Scheduled scan created');
+        loadScheduledScans();
+        setNewScanModel('');
+      } else {
+        const e = await r.json();
+        log('error', `Failed to create scan: ${e.detail || r.statusText}`);
+      }
+    } catch(e) {
+      log('error', `Create scan error: ${e}`);
+    }
+  };
+
+  const deleteScheduledScan = async (scanId: string) => {
+    try {
+      const r = await fetch(`${API_URL}/api/scheduled-scans/${scanId}`, { method: 'DELETE' });
+      if (r.ok) {
+        log('success', 'Scheduled scan deleted');
+        loadScheduledScans();
+      }
+    } catch(e) {
+      log('error', `Delete scan error: ${e}`);
+    }
+  };
+
+  const toggleScheduledScan = async (scanId: string, enabled: boolean) => {
+    try {
+      const r = await fetch(`${API_URL}/api/scheduled-scans/${scanId}/toggle`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled })
+      });
+      if (r.ok) {
+        log('success', `Scan ${enabled ? 'enabled' : 'disabled'}`);
+        loadScheduledScans();
+      }
+    } catch(e) {
+      log('error', `Toggle scan error: ${e}`);
+    }
   };
 
   const downloadSignalCombinerPDF = async (result: any) => {
@@ -751,13 +868,18 @@ export default function Home() {
             {!connected && <div style={{ ...S.card, background: 'var(--accent)', borderLeft: '4px solid var(--primary)', color: 'var(--accent-foreground)' }}><h3 style={{ margin: '0 0 0.5rem 0' }}>⚠️ Backend Not Connected</h3><p style={{ margin: 0 }}>Make sure the backend is running and accessible.</p></div>}
             {connected && (
               <>
-                <h2>Technical Models</h2>
+                <h2>Technical Models ({models.filter(m => m.category === 'Technical').length})</h2>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '15px', marginBottom: '30px' }}>
-                  {models.filter(m => m.category === 'Technical').map(m => <ModelCard key={m.id} model={m} result={results[m.id]} running={running === m.id} onRun={() => runModel(m.id)} onPDF={downloadPDF} />)}
+                  {models.filter(m => m.category === 'Technical').map(m => <ModelCard key={m.id} model={m} result={results[m.id]} running={running === m.id} onRun={() => runModel(m.id)} onPDF={downloadPDF} onRunWithParams={(params) => runModelWithParams(m.id, params)} />)}
                 </div>
-                <h2 style={{ marginTop: '30px' }}>Fundamental Models</h2>
+                <h2 style={{ marginTop: '30px' }}>Fundamental Models ({models.filter(m => m.category === 'Fundamental').length})</h2>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '15px', marginBottom: '30px' }}>
+                  {models.filter(m => m.category === 'Fundamental').map(m => <ModelCard key={m.id} model={m} result={results[m.id]} running={running === m.id} onRun={() => runModel(m.id)} onPDF={downloadPDF} onRunWithParams={(params) => runModelWithParams(m.id, params)} />)}
+                </div>
+                <h2 style={{ marginTop: '30px' }}>Quantitative Models ({models.filter(m => m.category === 'Quantitative').length})</h2>
+                <p style={{ color: 'var(--muted-foreground)', marginBottom: '15px' }}>Statistical arbitrage and quantitative strategies</p>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '15px' }}>
-                  {models.filter(m => m.category === 'Fundamental').map(m => <ModelCard key={m.id} model={m} result={results[m.id]} running={running === m.id} onRun={() => runModel(m.id)} onPDF={downloadPDF} />)}
+                  {models.filter(m => m.category === 'Quantitative').map(m => <ModelCard key={m.id} model={m} result={results[m.id]} running={running === m.id} onRun={() => runModel(m.id)} onPDF={downloadPDF} onRunWithParams={(params) => runModelWithParams(m.id, params)} />)}
                 </div>
               </>
             )}
@@ -1343,6 +1465,195 @@ export default function Home() {
               )}
             </div>
             
+            {/* Market Regime Detection */}
+            <div style={S.card}>
+              <h2 style={{ marginTop: 0 }}>📊 Market Regime Detection</h2>
+              <p style={{ color: 'var(--muted-foreground)', marginBottom: '20px' }}>Identify current market conditions (Bull/Bear/Neutral) to adjust your strategy accordingly.</p>
+              
+              <div style={{ display: 'flex', gap: '15px', marginBottom: '20px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', fontWeight: 'bold' }}>Index</label>
+                  <select style={{ ...S.select, width: '150px' }} value={marketRegimeIndex} onChange={e => setMarketRegimeIndex(e.target.value)}>
+                    <option value="SPY">SPY (S&P 500)</option>
+                    <option value="QQQ">QQQ (Nasdaq)</option>
+                    <option value="IWM">IWM (Russell 2000)</option>
+                    <option value="DIA">DIA (Dow Jones)</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', fontWeight: 'bold' }}>Universe</label>
+                  <select style={{ ...S.select, width: '150px' }} value={marketRegimeUniverse} onChange={e => setMarketRegimeUniverse(e.target.value)}>
+                    <optgroup label="Built-in">{universes.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}</optgroup>
+                  </select>
+                </div>
+                <button style={{ ...S.btn('primary') }} onClick={runMarketRegime} disabled={marketRegimeRunning}>
+                  {marketRegimeRunning ? '⏳ Detecting...' : '▶ Detect Regime'}
+                </button>
+              </div>
+              
+              {marketRegimeResults && (
+                <div style={{ marginTop: '20px' }}>
+                  {/* Regime Badge */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '20px' }}>
+                    <div style={{
+                      padding: '15px 30px',
+                      borderRadius: '10px',
+                      background: marketRegimeResults.regime === 'BULL' ? '#22c55e' : marketRegimeResults.regime === 'BEAR' ? '#ef4444' : '#f59e0b',
+                      color: 'white',
+                      fontSize: '24px',
+                      fontWeight: 'bold'
+                    }}>
+                      {marketRegimeResults.regime === 'BULL' ? '🐂' : marketRegimeResults.regime === 'BEAR' ? '🐻' : '➡️'} {marketRegimeResults.regime}
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '14px', color: 'var(--muted-foreground)' }}>Volatility Regime</div>
+                      <div style={{ fontSize: '18px', fontWeight: 'bold', color: marketRegimeResults.volatility_regime === 'HIGH' ? '#ef4444' : marketRegimeResults.volatility_regime === 'LOW' ? '#22c55e' : '#f59e0b' }}>
+                        {marketRegimeResults.volatility_regime}
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '14px', color: 'var(--muted-foreground)' }}>Risk Level</div>
+                      <div style={{ fontSize: '18px', fontWeight: 'bold' }}>{marketRegimeResults.risk_level}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '14px', color: 'var(--muted-foreground)' }}>Recommended Exposure</div>
+                      <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#3b82f6' }}>{marketRegimeResults.recommended_exposure}%</div>
+                    </div>
+                  </div>
+                  
+                  {/* Recommendation */}
+                  {marketRegimeResults.recommendation && (
+                    <div style={{ padding: '15px', background: 'var(--accent)', borderRadius: 'var(--radius)', marginBottom: '15px' }}>
+                      <h4 style={{ margin: '0 0 10px 0' }}>💡 Recommendation</h4>
+                      <p style={{ margin: 0 }}>{marketRegimeResults.recommendation}</p>
+                    </div>
+                  )}
+                  
+                  {/* Signals Grid */}
+                  {marketRegimeResults.signals && (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '10px', marginTop: '15px' }}>
+                      {Object.entries(marketRegimeResults.signals).map(([key, value]: [string, any]) => (
+                        <div key={key} style={{ padding: '10px', background: 'var(--muted)', borderRadius: 'var(--radius)', textAlign: 'center' }}>
+                          <div style={{ fontSize: '11px', color: 'var(--muted-foreground)', marginBottom: '5px' }}>{key.replace(/_/g, ' ')}</div>
+                          <div style={{ fontSize: '16px', fontWeight: 'bold', color: value ? '#22c55e' : '#ef4444' }}>
+                            {typeof value === 'boolean' ? (value ? '✓' : '✗') : value}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            
+            {/* Scheduled Scans */}
+            <div style={S.card}>
+              <h2 style={{ marginTop: 0 }}>⏰ Scheduled Scans</h2>
+              <p style={{ color: 'var(--muted-foreground)', marginBottom: '20px' }}>Set up automatic daily scans to run models at specific times.</p>
+              
+              {/* Create New Scan */}
+              <div style={{ background: 'var(--muted)', padding: '15px', borderRadius: 'var(--radius)', marginBottom: '20px' }}>
+                <h4 style={{ margin: '0 0 15px 0' }}>Create New Scheduled Scan</h4>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '15px', marginBottom: '15px' }}>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '5px', fontSize: '12px', fontWeight: 'bold' }}>Model</label>
+                    <select style={{ ...S.select, width: '100%' }} value={newScanModel} onChange={e => setNewScanModel(e.target.value)}>
+                      <option value="">Select model...</option>
+                      <optgroup label="Technical">
+                        {models.filter(m => m.category === 'Technical').map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                      </optgroup>
+                      <optgroup label="Fundamental">
+                        {models.filter(m => m.category === 'Fundamental').map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                      </optgroup>
+                      <optgroup label="Quantitative">
+                        {models.filter(m => m.category === 'Quantitative').map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                      </optgroup>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '5px', fontSize: '12px', fontWeight: 'bold' }}>Universe</label>
+                    <select style={{ ...S.select, width: '100%' }} value={newScanUniverse} onChange={e => setNewScanUniverse(e.target.value)}>
+                      <optgroup label="Built-in">{universes.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}</optgroup>
+                      {customUniverses.length > 0 && <optgroup label="Custom">{customUniverses.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}</optgroup>}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '5px', fontSize: '12px', fontWeight: 'bold' }}>Time (Market Hours)</label>
+                    <input type="time" style={{ ...S.input, marginBottom: 0 }} value={newScanTime} onChange={e => setNewScanTime(e.target.value)} />
+                  </div>
+                </div>
+                <div style={{ marginBottom: '15px' }}>
+                  <label style={{ display: 'block', marginBottom: '5px', fontSize: '12px', fontWeight: 'bold' }}>Days</label>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => (
+                      <button
+                        key={day}
+                        style={{
+                          padding: '5px 10px',
+                          borderRadius: 'var(--radius)',
+                          border: '1px solid var(--border)',
+                          background: newScanDays.includes(day) ? 'var(--primary)' : 'transparent',
+                          color: newScanDays.includes(day) ? 'white' : 'var(--foreground)',
+                          cursor: 'pointer',
+                          fontSize: '12px'
+                        }}
+                        onClick={() => {
+                          if (newScanDays.includes(day)) {
+                            setNewScanDays(newScanDays.filter(d => d !== day));
+                          } else {
+                            setNewScanDays([...newScanDays, day]);
+                          }
+                        }}
+                      >
+                        {day}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <button style={S.btn('success')} onClick={createScheduledScan}>
+                  ➕ Create Scheduled Scan
+                </button>
+              </div>
+              
+              {/* Existing Scans */}
+              <h4>Active Scans ({scheduledScans.length})</h4>
+              {scheduledScans.length === 0 ? (
+                <p style={{ color: 'var(--muted-foreground)', fontStyle: 'italic' }}>No scheduled scans yet. Create one above to automate your daily analysis.</p>
+              ) : (
+                <div style={{ display: 'grid', gap: '10px' }}>
+                  {scheduledScans.map((scan: any) => (
+                    <div key={scan.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', background: 'var(--muted)', borderRadius: 'var(--radius)' }}>
+                      <div>
+                        <div style={{ fontWeight: 'bold' }}>{scan.model_name || scan.model_id}</div>
+                        <div style={{ fontSize: '12px', color: 'var(--muted-foreground)' }}>
+                          {scan.universe} • {scan.schedule_time} • {scan.days?.join(', ')}
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <button
+                          style={{
+                            padding: '5px 10px',
+                            borderRadius: 'var(--radius)',
+                            border: 'none',
+                            background: scan.enabled ? '#22c55e' : 'var(--muted-foreground)',
+                            color: 'white',
+                            cursor: 'pointer',
+                            fontSize: '11px'
+                          }}
+                          onClick={() => toggleScheduledScan(scan.id, !scan.enabled)}
+                        >
+                          {scan.enabled ? 'ON' : 'OFF'}
+                        </button>
+                        <button style={{ ...S.btn('danger'), fontSize: '11px', padding: '5px 10px' }} onClick={() => deleteScheduledScan(scan.id)}>
+                          🗑️
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            
           </>
         )}
 
@@ -1585,15 +1896,98 @@ export default function Home() {
   );
 }
 
-// Model Card Component
-function ModelCard({ model, result, running, onRun, onPDF }: { model: Model; result?: ModelResult; running: boolean; onRun: () => void; onPDF: (id: string) => void }) {
+// Model Card Component with Parameter Customization
+function ModelCard({ model, result, running, onRun, onPDF, onRunWithParams }: { 
+  model: Model; 
+  result?: ModelResult; 
+  running: boolean; 
+  onRun: () => void; 
+  onPDF: (id: string) => void;
+  onRunWithParams?: (params: Record<string, any>) => void;
+}) {
+  const [showParams, setShowParams] = useState(false);
+  const [customParams, setCustomParams] = useState<Record<string, any>>(model.default_parameters || {});
+  
+  const handleParamChange = (key: string, value: any) => {
+    setCustomParams(prev => ({ ...prev, [key]: value }));
+  };
+  
+  const runWithCustomParams = () => {
+    if (onRunWithParams) {
+      onRunWithParams(customParams);
+    }
+    setShowParams(false);
+  };
+  
+  const getCategoryColor = () => {
+    if (model.category === 'Technical') return { bg: 'var(--accent)', color: 'var(--accent-foreground)' };
+    if (model.category === 'Quantitative') return { bg: '#8b5cf6', color: 'white' };
+    return { bg: 'var(--muted)', color: 'var(--muted-foreground)' };
+  };
+  
+  const catStyle = getCategoryColor();
+  
   return (
     <div style={S.card}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div><h3 style={{ margin: 0 }}>{model.name}</h3><span style={{ fontSize: '11px', padding: '2px 6px', borderRadius: 'var(--radius)', background: model.category === 'Technical' ? 'var(--accent)' : 'var(--muted)', color: model.category === 'Technical' ? 'var(--accent-foreground)' : 'var(--muted-foreground)' }}>{model.category}</span></div>
-        <button style={{ ...S.btn('primary'), opacity: running ? 0.6 : 1 }} onClick={onRun} disabled={running}>{running ? '⏳...' : '▶ Run'}</button>
+        <div>
+          <h3 style={{ margin: 0 }}>{model.name}</h3>
+          <span style={{ fontSize: '11px', padding: '2px 6px', borderRadius: 'var(--radius)', background: catStyle.bg, color: catStyle.color }}>{model.category}</span>
+        </div>
+        <div style={{ display: 'flex', gap: '5px' }}>
+          <button style={{ ...S.btn('secondary'), fontSize: '11px', padding: '4px 8px' }} onClick={() => setShowParams(!showParams)} title="Customize Parameters">⚙️</button>
+          <button style={{ ...S.btn('primary'), opacity: running ? 0.6 : 1 }} onClick={onRun} disabled={running}>{running ? '⏳...' : '▶ Run'}</button>
+        </div>
       </div>
       <p style={{ color: 'var(--muted-foreground)', fontSize: '12px', margin: '10px 0' }}>{model.description}</p>
+      
+      {/* Parameter Customization Panel */}
+      {showParams && model.default_parameters && (
+        <div style={{ background: 'var(--muted)', padding: '12px', borderRadius: 'var(--radius)', marginBottom: '10px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+            <h4 style={{ margin: 0, fontSize: '13px' }}>⚙️ Custom Parameters</h4>
+            <button style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px' }} onClick={() => setShowParams(false)}>✕</button>
+          </div>
+          <div style={{ display: 'grid', gap: '8px' }}>
+            {Object.entries(model.default_parameters).map(([key, defaultValue]) => (
+              <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <label style={{ fontSize: '11px', minWidth: '120px', color: 'var(--foreground)' }}>{key.replace(/_/g, ' ')}</label>
+                {typeof defaultValue === 'boolean' ? (
+                  <input 
+                    type="checkbox" 
+                    checked={customParams[key] ?? defaultValue}
+                    onChange={(e) => handleParamChange(key, e.target.checked)}
+                  />
+                ) : typeof defaultValue === 'number' ? (
+                  <input 
+                    type="number" 
+                    style={{ ...S.input, width: '80px', marginBottom: 0, padding: '4px 8px' }}
+                    value={customParams[key] ?? defaultValue}
+                    onChange={(e) => handleParamChange(key, parseFloat(e.target.value) || 0)}
+                    step={defaultValue < 1 ? 0.1 : 1}
+                  />
+                ) : (
+                  <input 
+                    type="text" 
+                    style={{ ...S.input, width: '100px', marginBottom: 0, padding: '4px 8px' }}
+                    value={customParams[key] ?? defaultValue}
+                    onChange={(e) => handleParamChange(key, e.target.value)}
+                  />
+                )}
+              </div>
+            ))}
+          </div>
+          <div style={{ marginTop: '10px', display: 'flex', gap: '8px' }}>
+            <button style={{ ...S.btn('success'), fontSize: '11px', padding: '6px 12px' }} onClick={runWithCustomParams} disabled={running}>
+              {running ? '⏳...' : '▶ Run with Custom'}
+            </button>
+            <button style={{ ...S.btn('secondary'), fontSize: '11px', padding: '6px 12px' }} onClick={() => setCustomParams(model.default_parameters || {})}>
+              Reset
+            </button>
+          </div>
+        </div>
+      )}
+      
       {result && (
         <div style={{ borderTop: '1px solid var(--border)', paddingTop: '10px' }}>
           <div style={{ display: 'flex', gap: '10px', marginBottom: '8px', fontSize: '12px', flexWrap: 'wrap' }}>
