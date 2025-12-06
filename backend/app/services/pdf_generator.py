@@ -517,8 +517,8 @@ class PDFReportGenerator:
         """
         story.append(Paragraph(meta_text, self.styles['SmallText']))
         story.append(Spacer(1, 20))
-        story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor('#e0e0e0')))
-        story.append(Spacer(1, 15))
+        story.append(HRFlowable(width="100%", thickness=1, color=self.colors['border']))
+        story.append(Spacer(1, 20))
         
         # Strong Buy Signals
         if strong_buy_signals:
@@ -537,16 +537,17 @@ class PDFReportGenerator:
             
             buy_table = Table(buy_data, colWidths=[1.2*inch, 1*inch, 1*inch, 2.3*inch])
             buy_table.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#28a745')),
+                ('BACKGROUND', (0, 0), (-1, 0), self.colors['success']),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
                 ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
                 ('FONTSIZE', (0, 0), (-1, -1), 9),
                 ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
                 ('ALIGN', (3, 1), (3, -1), 'LEFT'),
-                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e0e0e0')),
-                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f0fff4')]),
-                ('TOPPADDING', (0, 0), (-1, -1), 6),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+                ('GRID', (0, 0), (-1, -1), 0.5, self.colors['border']),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [self.colors['background'], colors.HexColor('#f0fdf4')]),
+                ('TEXTCOLOR', (0, 1), (-1, -1), self.colors['foreground']),
+                ('TOPPADDING', (0, 0), (-1, -1), 8),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
             ]))
             story.append(buy_table)
             story.append(Spacer(1, 20))
@@ -564,15 +565,16 @@ class PDFReportGenerator:
             
             mod_table = Table(mod_data, colWidths=[2*inch, 1.5*inch, 1.5*inch])
             mod_table.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#ffc107')),
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f59e0b')),  # Amber/orange for moderate
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
                 ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
                 ('FONTSIZE', (0, 0), (-1, -1), 9),
                 ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e0e0e0')),
-                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#fffbf0')]),
-                ('TOPPADDING', (0, 0), (-1, -1), 6),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+                ('GRID', (0, 0), (-1, -1), 0.5, self.colors['border']),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [self.colors['background'], colors.HexColor('#fffbeb')]),
+                ('TEXTCOLOR', (0, 1), (-1, -1), self.colors['foreground']),
+                ('TOPPADDING', (0, 0), (-1, -1), 8),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
             ]))
             story.append(mod_table)
             story.append(Spacer(1, 20))
@@ -594,16 +596,17 @@ class PDFReportGenerator:
             
             sell_table = Table(sell_data, colWidths=[1.2*inch, 1*inch, 1*inch, 2.3*inch])
             sell_table.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#dc3545')),
+                ('BACKGROUND', (0, 0), (-1, 0), self.colors['destructive']),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
                 ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
                 ('FONTSIZE', (0, 0), (-1, -1), 9),
                 ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
                 ('ALIGN', (3, 1), (3, -1), 'LEFT'),
-                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e0e0e0')),
-                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#fff5f5')]),
-                ('TOPPADDING', (0, 0), (-1, -1), 6),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+                ('GRID', (0, 0), (-1, -1), 0.5, self.colors['border']),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [self.colors['background'], colors.HexColor('#fef2f2')]),
+                ('TEXTCOLOR', (0, 1), (-1, -1), self.colors['foreground']),
+                ('TOPPADDING', (0, 0), (-1, -1), 8),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
             ]))
             story.append(sell_table)
         
@@ -657,8 +660,8 @@ class PDFReportGenerator:
         """
         story.append(Paragraph(meta_text, self.styles['SmallText']))
         story.append(Spacer(1, 20))
-        story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor('#e0e0e0')))
-        story.append(Spacer(1, 15))
+        story.append(HRFlowable(width="100%", thickness=1, color=self.colors['border']))
+        story.append(Spacer(1, 20))
         
         # Rotation Recommendation
         if rotation_recommendation:
@@ -687,15 +690,16 @@ class PDFReportGenerator:
         
         sector_table = Table(sector_data, colWidths=[0.6*inch, 1.5*inch, 1*inch, 0.8*inch, 0.8*inch, 0.8*inch, 0.8*inch])
         sector_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#4a90d9')),
+            ('BACKGROUND', (0, 0), (-1, 0), self.colors['primary']),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
             ('FONTSIZE', (0, 0), (-1, -1), 9),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e0e0e0')),
-            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f8f9fa')]),
-            ('TOPPADDING', (0, 0), (-1, -1), 6),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+            ('GRID', (0, 0), (-1, -1), 0.5, self.colors['border']),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [self.colors['background'], self.colors['muted']]),
+            ('TEXTCOLOR', (0, 1), (-1, -1), self.colors['foreground']),
+            ('TOPPADDING', (0, 0), (-1, -1), 8),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
         ]))
         story.append(sector_table)
         
@@ -747,8 +751,8 @@ class PDFReportGenerator:
         """
         story.append(Paragraph(meta_text, self.styles['SmallText']))
         story.append(Spacer(1, 20))
-        story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor('#e0e0e0')))
-        story.append(Spacer(1, 15))
+        story.append(HRFlowable(width="100%", thickness=1, color=self.colors['border']))
+        story.append(Spacer(1, 20))
         
         # Regime Summary
         story.append(Paragraph("Market Regime Assessment", self.styles['SectionHeader']))
@@ -768,10 +772,11 @@ class PDFReportGenerator:
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
             ('FONTSIZE', (0, 0), (-1, -1), 10),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e0e0e0')),
-            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f8f9fa')]),
-            ('TOPPADDING', (0, 0), (-1, -1), 8),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+            ('GRID', (0, 0), (-1, -1), 0.5, self.colors['border']),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [self.colors['background'], self.colors['muted']]),
+            ('TEXTCOLOR', (0, 1), (-1, -1), self.colors['foreground']),
+            ('TOPPADDING', (0, 0), (-1, -1), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
         ]))
         story.append(summary_table)
         story.append(Spacer(1, 20))
@@ -800,15 +805,16 @@ class PDFReportGenerator:
             ]
             metrics_table = Table(metrics_data, colWidths=[2.5*inch, 2*inch])
             metrics_table.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#4a90d9')),
+                ('BACKGROUND', (0, 0), (-1, 0), self.colors['primary']),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
                 ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
                 ('FONTSIZE', (0, 0), (-1, -1), 9),
                 ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e0e0e0')),
-                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f8f9fa')]),
-                ('TOPPADDING', (0, 0), (-1, -1), 6),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+                ('GRID', (0, 0), (-1, -1), 0.5, self.colors['border']),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [self.colors['background'], self.colors['muted']]),
+                ('TEXTCOLOR', (0, 1), (-1, -1), self.colors['foreground']),
+                ('TOPPADDING', (0, 0), (-1, -1), 8),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
             ]))
             story.append(metrics_table)
             story.append(Spacer(1, 20))
@@ -826,15 +832,16 @@ class PDFReportGenerator:
             
             signals_table = Table(signals_data, colWidths=[3*inch, 1.5*inch])
             signals_table.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#6c757d')),
+                ('BACKGROUND', (0, 0), (-1, 0), self.colors['muted_foreground']),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
                 ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
                 ('FONTSIZE', (0, 0), (-1, -1), 9),
                 ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e0e0e0')),
-                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f8f9fa')]),
-                ('TOPPADDING', (0, 0), (-1, -1), 6),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+                ('GRID', (0, 0), (-1, -1), 0.5, self.colors['border']),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [self.colors['background'], self.colors['muted']]),
+                ('TEXTCOLOR', (0, 1), (-1, -1), self.colors['foreground']),
+                ('TOPPADDING', (0, 0), (-1, -1), 8),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
             ]))
             story.append(signals_table)
         
