@@ -1339,18 +1339,51 @@ export default function Home() {
             </div>
             <div style={S.card}>
               <h3 style={{ marginTop: 0 }}>📋 Application Logs ({logs.length})</h3>
-              <div style={{ maxHeight: '300px', overflow: 'auto', fontFamily: 'monospace', fontSize: '12px' }}>
+              <div style={{ maxHeight: '300px', overflow: 'auto', fontFamily: 'var(--font-mono)', fontSize: '0.75rem', borderRadius: 'var(--radius)', background: 'var(--muted)', padding: '0.5rem' }}>
                 {logs.slice().reverse().map((l, i) => (
-                  <div key={i} style={{ padding: '6px', borderLeft: `3px solid ${l.type === 'error' ? '#dc3545' : l.type === 'success' ? '#28a745' : '#17a2b8'}`, background: l.type === 'error' ? '#fff5f5' : l.type === 'success' ? '#f0fff4' : '#f0f9ff', marginBottom: '3px' }}>
-                    [{l.time}] {l.message}
+                  <div key={i} style={{ 
+                    padding: '0.5rem', 
+                    borderLeft: `3px solid ${l.type === 'error' ? 'var(--destructive)' : l.type === 'success' ? '#22c55e' : 'var(--primary)'}`, 
+                    background: l.type === 'error' ? 'rgba(239, 68, 68, 0.1)' : l.type === 'success' ? 'rgba(34, 197, 94, 0.1)' : 'rgba(59, 130, 246, 0.1)', 
+                    marginBottom: '0.375rem',
+                    borderRadius: 'var(--radius)',
+                    color: 'var(--foreground)'
+                  }}>
+                    <span style={{ color: 'var(--muted-foreground)', marginRight: '0.5rem' }}>[{l.time}]</span>
+                    <span style={{ color: l.type === 'error' ? 'var(--destructive)' : l.type === 'success' ? '#22c55e' : 'var(--foreground)' }}>{l.message}</span>
                   </div>
                 ))}
               </div>
               <button style={{ ...S.btn('secondary'), marginTop: '10px' }} onClick={() => setLogs([])}>Clear</button>
             </div>
             <div style={S.card}>
-              <h3 style={{ marginTop: 0 }}>🔧 Troubleshooting</h3>
-              <ol><li>Open terminal in <code>backend</code> folder</li><li>Run: <code>pip install -r requirements.txt</code></li><li>Run: <code>uvicorn app.main:app --reload --port 8000</code></li><li>Test: <a href="http://localhost:8000/health" target="_blank">http://localhost:8000/health</a></li></ol>
+              <h3 style={{ marginTop: 0, marginBottom: '1rem' }}>🔧 Troubleshooting</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
+                  <span style={{ color: 'var(--primary)', fontWeight: '600', minWidth: '1.5rem' }}>1.</span>
+                  <div style={{ flex: 1, color: 'var(--foreground)' }}>
+                    Open terminal in <code style={{ background: 'var(--muted)', padding: '0.125rem 0.375rem', borderRadius: 'var(--radius)', fontFamily: 'var(--font-mono)', fontSize: '0.875rem', color: 'var(--foreground)' }}>backend</code> folder
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
+                  <span style={{ color: 'var(--primary)', fontWeight: '600', minWidth: '1.5rem' }}>2.</span>
+                  <div style={{ flex: 1, color: 'var(--foreground)' }}>
+                    Run: <code style={{ background: 'var(--muted)', padding: '0.125rem 0.375rem', borderRadius: 'var(--radius)', fontFamily: 'var(--font-mono)', fontSize: '0.875rem', color: 'var(--foreground)' }}>pip install -r requirements.txt</code>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
+                  <span style={{ color: 'var(--primary)', fontWeight: '600', minWidth: '1.5rem' }}>3.</span>
+                  <div style={{ flex: 1, color: 'var(--foreground)' }}>
+                    Run: <code style={{ background: 'var(--muted)', padding: '0.125rem 0.375rem', borderRadius: 'var(--radius)', fontFamily: 'var(--font-mono)', fontSize: '0.875rem', color: 'var(--foreground)' }}>uvicorn app.main:app --reload --port 8000</code>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
+                  <span style={{ color: 'var(--primary)', fontWeight: '600', minWidth: '1.5rem' }}>4.</span>
+                  <div style={{ flex: 1, color: 'var(--foreground)' }}>
+                    Test: <a href="http://localhost:8000/health" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)', textDecoration: 'none', borderBottom: '1px solid var(--primary)', transition: 'opacity 0.2s ease' }} onMouseEnter={(e) => e.currentTarget.style.opacity = '0.8'} onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}>http://localhost:8000/health</a>
+                  </div>
+                </div>
+              </div>
             </div>
           </>
         )}
