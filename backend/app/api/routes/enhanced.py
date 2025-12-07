@@ -631,7 +631,7 @@ async def export_enhanced_pdf(request: EnhancedPDFRequest):
             sell_signals=sell_signals,
             market_regime=market_regime,
             total_analyzed=len(tickers),
-            stocks_with_data=result.stocks_with_data,
+            stocks_with_data=len(result.rankings),
             description=model.description
         )
         
