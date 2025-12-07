@@ -293,6 +293,60 @@ async def export_market_regime_pdf(result: Dict):
         raise HTTPException(status_code=500, detail=f"Failed to generate PDF: {str(e)}")
 
 
+@router.get("/market-regime/pdf")
+async def get_market_regime_pdf(
+    index: str = Query("SPY", description="Market index ticker"),
+    universe: Optional[str] = Query(None, description="Universe for breadth calculation")
+):
+    """Detect market regime and export as PDF in one call"""
+    try:
+        # First detect the regime
+        fetcher = get_fetcher()
+        detector = get_regime_detector()
+        
+        # Get index data
+        index_data = fetcher.get_price_data(index, period="2y")
+        if index_data is None or len(index_data) < 252:
+            raise HTTPException(status_code=400, detail=f"Insufficient data for {index}")
+        
+        # Detect regime
+        regime = detector.detect_regime(index_data)
+        result = detector.to_dict(regime)
+        result['index'] = index
+        result['timestamp'] = datetime.now().isoformat()
+        
+        # Calculate breadth if universe provided
+        if universe:
+            tickers = get_tickers(universe)
+            if tickers:
+                price_data = fetcher.get_bulk_price_data(tickers, period="6mo")
+                breadth = detector.calculate_breadth(price_data)
+                result['breadth'] = breadth
+        
+        # Generate PDF
+        pdf_generator = get_pdf_generator()
+        pdf_bytes = pdf_generator.generate_market_regime_report(
+            index=index,
+            regime=result,
+            timestamp=result.get('timestamp')
+        )
+        
+        index_name = index.replace('^', '').replace('.', '_')
+        date_str = datetime.now().strftime('%Y-%m-%d_%H%M%S')
+        filename = f"MarketRegime_{index_name}_{date_str}.pdf"
+        
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error generating market regime PDF: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to generate PDF: {str(e)}")
+
+
 # ==================== BACKTESTING ====================
 
 class BacktestRequest(BaseModel):

@@ -1220,7 +1220,7 @@ export default function Home() {
                     <h2>📊 Technical Models ({models.filter(m => m.category === 'Technical').length})</h2>
                     <p style={{ color: 'var(--muted-foreground)', marginBottom: '15px' }}>Chart patterns, indicators, and price action strategies</p>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '15px', marginBottom: '30px' }}>
-                      {models.filter(m => m.category === 'Technical').map(m => <ModelCard key={m.id} model={m} result={results[m.id]} running={running === m.id} onRun={() => runModel(m.id)} onPDF={downloadPDF} onRunWithParams={(params) => runModelWithParams(m.id, params)} />)}
+                      {models.filter(m => m.category === 'Technical').map(m => <ModelCard key={m.id} model={m} result={results[m.id]} running={running === m.id} onRun={() => runModel(m.id)} onPDF={downloadPDF} onEnhancedPDF={downloadEnhancedPDF} onRunWithParams={(params) => runModelWithParams(m.id, params)} />)}
                     </div>
                   </>
                 )}
@@ -1231,7 +1231,7 @@ export default function Home() {
                     <h2 style={{ marginTop: modelSubTab === 'all' ? '30px' : '0' }}>💰 Fundamental Models ({models.filter(m => m.category === 'Fundamental').length})</h2>
                     <p style={{ color: 'var(--muted-foreground)', marginBottom: '15px' }}>Value investing, quality metrics, and financial analysis</p>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '15px', marginBottom: '30px' }}>
-                      {models.filter(m => m.category === 'Fundamental').map(m => <ModelCard key={m.id} model={m} result={results[m.id]} running={running === m.id} onRun={() => runModel(m.id)} onPDF={downloadPDF} onRunWithParams={(params) => runModelWithParams(m.id, params)} />)}
+                      {models.filter(m => m.category === 'Fundamental').map(m => <ModelCard key={m.id} model={m} result={results[m.id]} running={running === m.id} onRun={() => runModel(m.id)} onPDF={downloadPDF} onEnhancedPDF={downloadEnhancedPDF} onRunWithParams={(params) => runModelWithParams(m.id, params)} />)}
                     </div>
                   </>
                 )}
@@ -1242,7 +1242,7 @@ export default function Home() {
                     <h2 style={{ marginTop: modelSubTab === 'all' ? '30px' : '0' }}>🔢 Quantitative Models ({models.filter(m => m.category === 'Quantitative').length})</h2>
                     <p style={{ color: 'var(--muted-foreground)', marginBottom: '15px' }}>Statistical arbitrage and quantitative strategies</p>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '15px' }}>
-                      {models.filter(m => m.category === 'Quantitative').map(m => <ModelCard key={m.id} model={m} result={results[m.id]} running={running === m.id} onRun={() => runModel(m.id)} onPDF={downloadPDF} onRunWithParams={(params) => runModelWithParams(m.id, params)} />)}
+                      {models.filter(m => m.category === 'Quantitative').map(m => <ModelCard key={m.id} model={m} result={results[m.id]} running={running === m.id} onRun={() => runModel(m.id)} onPDF={downloadPDF} onEnhancedPDF={downloadEnhancedPDF} onRunWithParams={(params) => runModelWithParams(m.id, params)} />)}
                     </div>
                   </>
                 )}
@@ -2536,12 +2536,13 @@ export default function Home() {
 }
 
 // Model Card Component with Parameter Customization
-function ModelCard({ model, result, running, onRun, onPDF, onRunWithParams }: { 
+function ModelCard({ model, result, running, onRun, onPDF, onEnhancedPDF, onRunWithParams }: { 
   model: Model; 
   result?: ModelResult; 
   running: boolean; 
   onRun: () => void; 
   onPDF: (id: string) => void;
+  onEnhancedPDF: (modelId: string) => void;
   onRunWithParams?: (params: Record<string, any>) => void;
 }) {
   const [showParams, setShowParams] = useState(false);
@@ -2640,7 +2641,10 @@ function ModelCard({ model, result, running, onRun, onPDF, onRunWithParams }: {
               <b>{s.ticker.replace('.BK', '')}</b><span>${s.price_at_signal.toFixed(2)}</span><span style={{ color: '#22c55e' }}>{s.score.toFixed(0)}</span>
             </div>
           ))}
-          <button style={{ ...S.btn('secondary'), marginTop: '8px', fontSize: '11px' }} onClick={() => onPDF(result.run_id)}>📄 Download PDF</button>
+          <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+            <button style={{ ...S.btn('secondary'), fontSize: '11px' }} onClick={() => onPDF(result.run_id)}>📄 PDF</button>
+            <button style={{ ...S.btn('primary'), fontSize: '11px' }} onClick={() => onEnhancedPDF(model.id)}>📊 Enhanced PDF</button>
+          </div>
         </div>
       )}
     </div>
