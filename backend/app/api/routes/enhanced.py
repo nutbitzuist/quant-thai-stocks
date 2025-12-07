@@ -90,7 +90,7 @@ class ModelInfo(BaseModel):
 # ==================== ENDPOINTS ====================
 
 @router.get("/models/available")
-async def get_available_models() -> Dict[str, List[ModelInfo]]:
+async def get_available_models():
     """
     Get all available models grouped by category.
     Use this to populate model selection UI.
@@ -126,8 +126,15 @@ async def get_available_models() -> Dict[str, List[ModelInfo]]:
         except Exception as e:
             logger.warning(f"Could not load model {model_id}: {e}")
     
+    # Convert to dicts for JSON serialization
+    serialized = {
+        cat: [m.model_dump() for m in models]
+        for cat, models in models_by_category.items()
+    }
+    
     return {
-        "categories": models_by_category,
+        "models": [m.model_dump() for models in models_by_category.values() for m in models],
+        "by_category": serialized,
         "total_models": sum(len(v) for v in models_by_category.values())
     }
 
