@@ -1153,15 +1153,19 @@ export default function Home() {
         </div>
 
         {/* Universe Selector at bottom */}
-        {!sidebarCollapsed && (
-          <div style={{ padding: '0.75rem', borderTop: '1px solid var(--border)' }}>
-            <label style={{ fontSize: '0.7rem', color: 'var(--muted-foreground)', display: 'block', marginBottom: '4px' }}>Universe</label>
+        <div style={{ padding: sidebarCollapsed ? '0.5rem' : '0.75rem', borderTop: '1px solid var(--border)' }}>
+          {!sidebarCollapsed && <label style={{ fontSize: '0.7rem', color: 'var(--muted-foreground)', display: 'block', marginBottom: '4px' }}>Universe</label>}
+          {sidebarCollapsed ? (
+            <div style={{ textAlign: 'center' }} title={`Universe: ${universe}`}>
+              <span style={{ fontSize: '1.2rem' }}>🌐</span>
+            </div>
+          ) : (
             <select style={{ ...S.select, width: '100%', marginRight: 0, fontSize: '0.8rem' }} value={universe} onChange={e => setUniverse(e.target.value)}>
               <optgroup label="Built-in">{universes.map(u => <option key={u.id} value={u.id}>{u.name} ({u.count})</option>)}</optgroup>
               {customUniverses.length > 0 && <optgroup label="Custom">{customUniverses.map(u => <option key={u.id} value={u.id}>{u.name} ({u.count})</option>)}</optgroup>}
             </select>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Main Content */}

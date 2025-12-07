@@ -189,7 +189,7 @@ class PDFReportGenerator:
         story = []
         
         # Title with modern styling
-        story.append(Paragraph(f"📊 {model_name}", self.styles['CustomTitle']))
+        story.append(Paragraph(f"{model_name}", self.styles['CustomTitle']))
         story.append(Paragraph(
             f"Signal Report • {category} Model",
             self.styles['BodyText']
@@ -262,7 +262,7 @@ class PDFReportGenerator:
         
         # Buy Signals Table
         if buy_signals:
-            story.append(Paragraph("🟢 Buy Signals", self.styles['SectionHeader']))
+            story.append(Paragraph("Buy Signals", self.styles['SectionHeader']))
             buy_data = [['Rank', 'Ticker', 'Score', 'Price']]
             for i, signal in enumerate(buy_signals[:15], 1):
                 buy_data.append([
@@ -291,7 +291,7 @@ class PDFReportGenerator:
         
         # Sell Signals Table
         if sell_signals:
-            story.append(Paragraph("🔴 Sell Signals", self.styles['SectionHeader']))
+            story.append(Paragraph("Sell Signals", self.styles['SectionHeader']))
             sell_data = [['Rank', 'Ticker', 'Score', 'Price']]
             for i, signal in enumerate(sell_signals[:15], 1):
                 sell_data.append([
@@ -322,7 +322,7 @@ class PDFReportGenerator:
         story.append(HRFlowable(width="100%", thickness=1, color=self.colors['border']))
         story.append(Spacer(1, 12))
         footer_text = f"""
-        <b>📈 Quant Stock Analysis v2</b><br/>
+        <b>Quant Stock Analysis v2</b><br/>
         Generated on {generated_time}
         """
         story.append(Paragraph(footer_text, self.styles['FooterText']))
@@ -360,7 +360,7 @@ class PDFReportGenerator:
         story = []
         
         # Title
-        story.append(Paragraph(f"📊 Backtest Report: {model_name}", self.styles['CustomTitle']))
+        story.append(Paragraph(f"Backtest Report: {model_name}", self.styles['CustomTitle']))
         story.append(Paragraph(
             f"Performance Analysis • {universe.upper()}",
             self.styles['BodyText']
@@ -479,7 +479,7 @@ class PDFReportGenerator:
         story.append(HRFlowable(width="100%", thickness=1, color=self.colors['border']))
         story.append(Spacer(1, 12))
         footer_text = f"""
-        <b>📈 Quant Stock Analysis v2</b><br/>
+        <b>Quant Stock Analysis v2</b><br/>
         Generated on {generated_time}
         """
         story.append(Paragraph(footer_text, self.styles['FooterText']))
@@ -533,7 +533,7 @@ class PDFReportGenerator:
         
         # Strong Buy Signals
         if strong_buy_signals:
-            story.append(Paragraph("🟢 Strong Buy Signals", self.styles['SectionHeader']))
+            story.append(Paragraph("Strong Buy Signals", self.styles['SectionHeader']))
             buy_data = [['Ticker', 'Confirmations', 'Avg Score', 'Models']]
             for signal in strong_buy_signals[:30]:
                 models_str = ', '.join(signal.get('models', [])[:3])
@@ -592,7 +592,7 @@ class PDFReportGenerator:
         
         # Strong Sell Signals
         if strong_sell_signals:
-            story.append(Paragraph("🔴 Strong Sell Signals", self.styles['SectionHeader']))
+            story.append(Paragraph("Strong Sell Signals", self.styles['SectionHeader']))
             sell_data = [['Ticker', 'Confirmations', 'Avg Score', 'Models']]
             for signal in strong_sell_signals[:30]:
                 models_str = ', '.join(signal.get('models', [])[:3])
@@ -627,7 +627,7 @@ class PDFReportGenerator:
         story.append(HRFlowable(width="100%", thickness=1, color=self.colors['border']))
         story.append(Spacer(1, 12))
         footer_text = f"""
-        <b>📈 Quant Stock Analysis v2</b><br/>
+        <b>Quant Stock Analysis v2</b><br/>
         Generated on {generated_time}
         """
         story.append(Paragraph(footer_text, self.styles['FooterText']))
@@ -676,7 +676,7 @@ class PDFReportGenerator:
         
         # Rotation Recommendation
         if rotation_recommendation:
-            story.append(Paragraph("💡 Rotation Recommendation", self.styles['SectionHeader']))
+            story.append(Paragraph("Rotation Recommendation", self.styles['SectionHeader']))
             rec_text = f"""
             <b>Summary:</b> {rotation_recommendation.get('summary', 'N/A')}<br/><br/>
             <b>Overweight Sectors:</b> {', '.join(rotation_recommendation.get('overweight', [])) or 'None'}<br/>
@@ -720,7 +720,7 @@ class PDFReportGenerator:
         story.append(HRFlowable(width="100%", thickness=1, color=self.colors['border']))
         story.append(Spacer(1, 12))
         footer_text = f"""
-        <b>📈 Quant Stock Analysis v2</b><br/>
+        <b>Quant Stock Analysis v2</b><br/>
         Generated on {generated_time}
         """
         story.append(Paragraph(footer_text, self.styles['FooterText']))
@@ -749,7 +749,7 @@ class PDFReportGenerator:
         story = []
         
         # Title
-        story.append(Paragraph("📈 Market Regime Detection", self.styles['CustomTitle']))
+        story.append(Paragraph("Market Regime Detection", self.styles['CustomTitle']))
         story.append(Paragraph(
             f"Market Condition Analysis • {index}",
             self.styles['BodyText']
@@ -793,7 +793,7 @@ class PDFReportGenerator:
         story.append(Spacer(1, 20))
         
         # Recommendation
-        story.append(Paragraph("💡 Recommendation", self.styles['SectionHeader']))
+        story.append(Paragraph("Recommendation", self.styles['SectionHeader']))
         story.append(Paragraph(regime.get('recommendation', 'No recommendation available'), self.styles['BodyText']))
         story.append(Spacer(1, 20))
         
@@ -862,7 +862,7 @@ class PDFReportGenerator:
         story.append(HRFlowable(width="100%", thickness=1, color=self.colors['border']))
         story.append(Spacer(1, 12))
         footer_text = f"""
-        <b>📈 Quant Stock Analysis v2</b><br/>
+        <b>Quant Stock Analysis v2</b><br/>
         Generated on {generated_time}
         """
         story.append(Paragraph(footer_text, self.styles['FooterText']))
@@ -903,7 +903,7 @@ class PDFReportGenerator:
         generated_time = datetime.now(bangkok_tz).strftime('%Y-%m-%d %H:%M:%S ICT')
         
         # Title
-        story.append(Paragraph(f"📈 {model_name}", self.styles['CustomTitle']))
+        story.append(Paragraph(f"{model_name}", self.styles['CustomTitle']))
         story.append(Paragraph(f"Enhanced Signal Report • {universe.upper()}", self.styles['SubTitle']))
         story.append(Spacer(1, 5))
         story.append(Paragraph(f"Generated: {generated_time}", self.styles['SmallText']))
@@ -913,7 +913,7 @@ class PDFReportGenerator:
         
         # Market Regime Section (if available)
         if market_regime:
-            story.append(Paragraph("📊 Market Regime", self.styles['SectionHeader']))
+            story.append(Paragraph("Market Regime", self.styles['SectionHeader']))
             regime = market_regime.get('regime', 'UNKNOWN')
             regime_color = self.colors['success'] if regime == 'BULL' else self.colors['destructive'] if regime == 'BEAR' else colors.HexColor('#f59e0b')
             
@@ -945,11 +945,11 @@ class PDFReportGenerator:
             
             if market_regime.get('recommendation'):
                 story.append(Spacer(1, 10))
-                story.append(Paragraph(f"<b>💡 Recommendation:</b> {market_regime['recommendation']}", self.styles['BodyText']))
+                story.append(Paragraph(f"<b>Recommendation:</b> {market_regime['recommendation']}", self.styles['BodyText']))
             story.append(Spacer(1, 20))
         
         # Summary Stats
-        story.append(Paragraph("📋 Summary", self.styles['SectionHeader']))
+        story.append(Paragraph("Summary", self.styles['SectionHeader']))
         summary_data = [
             ['Metric', 'Value'],
             ['Buy Signals', str(len(buy_signals))],
@@ -973,7 +973,7 @@ class PDFReportGenerator:
         
         # Buy Signals with Enhanced Context
         if buy_signals:
-            story.append(Paragraph("🟢 Buy Signals", self.styles['SectionHeader']))
+            story.append(Paragraph("Buy Signals", self.styles['SectionHeader']))
             
             for i, signal in enumerate(buy_signals[:10], 1):
                 ticker = signal.get('ticker', '').replace('.BK', '')
@@ -987,7 +987,7 @@ class PDFReportGenerator:
                 # Why this signal (reasons)
                 reasons = context.get('primary_reasons', [])
                 if reasons:
-                    story.append(Paragraph("<b>📌 Why This Signal:</b>", self.styles['BodyText']))
+                    story.append(Paragraph("<b>Why This Signal:</b>", self.styles['BodyText']))
                     for reason in reasons[:3]:
                         factor = reason.get('factor', '')
                         desc = reason.get('description', '')
@@ -997,7 +997,7 @@ class PDFReportGenerator:
                 risks = context.get('risk_factors', [])
                 if risks:
                     story.append(Spacer(1, 5))
-                    story.append(Paragraph("<b>⚠️ Risk Factors:</b>", self.styles['BodyText']))
+                    story.append(Paragraph("<b>Risk Factors:</b>", self.styles['BodyText']))
                     for risk in risks[:3]:
                         factor = risk.get('factor', '')
                         level = risk.get('level', '')
@@ -1012,7 +1012,7 @@ class PDFReportGenerator:
                     stop_loss = position.get('stop_loss_pct', 0)
                     take_profit = position.get('take_profit_pct', 0)
                     story.append(Paragraph(
-                        f"<b>💼 Position:</b> {portfolio_pct}% of portfolio | Conviction: {conviction} | Stop: {stop_loss}% | Target: +{take_profit}%",
+                        f"<b>Position:</b> {portfolio_pct}% of portfolio | Conviction: {conviction} | Stop: {stop_loss}% | Target: +{take_profit}%",
                         self.styles['SmallText']
                     ))
                 
@@ -1022,7 +1022,7 @@ class PDFReportGenerator:
         
         # Sell Signals with Enhanced Context
         if sell_signals:
-            story.append(Paragraph("🔴 Sell Signals", self.styles['SectionHeader']))
+            story.append(Paragraph("Sell Signals", self.styles['SectionHeader']))
             
             for i, signal in enumerate(sell_signals[:10], 1):
                 ticker = signal.get('ticker', '').replace('.BK', '')
@@ -1036,7 +1036,7 @@ class PDFReportGenerator:
                 # Why this signal
                 reasons = context.get('primary_reasons', [])
                 if reasons:
-                    story.append(Paragraph("<b>📌 Why This Signal:</b>", self.styles['BodyText']))
+                    story.append(Paragraph("<b>Why This Signal:</b>", self.styles['BodyText']))
                     for reason in reasons[:3]:
                         factor = reason.get('factor', '')
                         desc = reason.get('description', '')
@@ -1046,7 +1046,7 @@ class PDFReportGenerator:
                 risks = context.get('risk_factors', [])
                 if risks:
                     story.append(Spacer(1, 5))
-                    story.append(Paragraph("<b>⚠️ Risk Factors:</b>", self.styles['BodyText']))
+                    story.append(Paragraph("<b>Risk Factors:</b>", self.styles['BodyText']))
                     for risk in risks[:3]:
                         factor = risk.get('factor', '')
                         level = risk.get('level', '')
@@ -1061,7 +1061,7 @@ class PDFReportGenerator:
         story.append(HRFlowable(width="100%", thickness=1, color=self.colors['border']))
         story.append(Spacer(1, 12))
         footer_text = f"""
-        <b>📈 Quant Stock Analysis v2 - Enhanced Report</b><br/>
+        <b>Quant Stock Analysis v2 - Enhanced Report</b><br/>
         Generated on {generated_time}
         """
         story.append(Paragraph(footer_text, self.styles['FooterText']))
