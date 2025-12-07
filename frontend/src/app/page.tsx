@@ -184,6 +184,24 @@ export default function Home() {
   const [marketRegimeRunning, setMarketRegimeRunning] = useState(false);
   const [marketRegimeResults, setMarketRegimeResults] = useState<any>(null);
   
+  // Enhanced Signal Combiner state
+  const [enhancedCombinerUniverse, setEnhancedCombinerUniverse] = useState('sp50');
+  const [enhancedCombinerModels, setEnhancedCombinerModels] = useState<string[]>([]);
+  const [enhancedCombinerMethod, setEnhancedCombinerMethod] = useState('weighted');
+  const [enhancedCombinerMinModels, setEnhancedCombinerMinModels] = useState(2);
+  const [enhancedCombinerRunning, setEnhancedCombinerRunning] = useState(false);
+  const [enhancedCombinerResults, setEnhancedCombinerResults] = useState<any>(null);
+  const [availableModelsForCombiner, setAvailableModelsForCombiner] = useState<any>(null);
+  
+  // Model Validation state
+  const [validationModel, setValidationModel] = useState('');
+  const [validationUniverse, setValidationUniverse] = useState('sp50');
+  const [validationHoldingPeriod, setValidationHoldingPeriod] = useState(21);
+  const [validationRunning, setValidationRunning] = useState(false);
+  const [validationResults, setValidationResults] = useState<any>(null);
+  const [validationAllRunning, setValidationAllRunning] = useState(false);
+  const [validationAllResults, setValidationAllResults] = useState<any>(null);
+  
   // Scheduled Scans state
   const [scheduledScans, setScheduledScans] = useState<any[]>([]);
   const [newScanModel, setNewScanModel] = useState('');
@@ -397,6 +415,125 @@ export default function Home() {
       log('error', `Market regime error: ${e}`);
     }
     setMarketRegimeRunning(false);
+  };
+
+  // Enhanced Signal Combiner functions
+  const loadAvailableModels = async () => {
+    try {
+      const r = await fetch(`${API_URL}/api/enhanced/models/available`);
+      if (r.ok) {
+        const d = await r.json();
+        setAvailableModelsForCombiner(d);
+      }
+    } catch(e) { /* ignore */ }
+  };
+
+  const runEnhancedCombiner = async () => {
+    setEnhancedCombinerRunning(true);
+    log('info', 'Running enhanced signal combiner...');
+    try {
+      const body: any = {
+        universe: enhancedCombinerUniverse,
+        combine_method: enhancedCombinerMethod,
+        min_models: enhancedCombinerMinModels,
+        min_confidence: 40,
+        include_context: true,
+        top_n: 20
+      };
+      if (enhancedCombinerModels.length > 0) {
+        body.models = enhancedCombinerModels;
+      }
+      const r = await fetch(`${API_URL}/api/enhanced/combine-signals`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      if (r.ok) {
+        const d = await r.json();
+        setEnhancedCombinerResults(d);
+        log('success', `Combined ${d.models_used} models: ${d.buy_count} buy, ${d.sell_count} sell signals`);
+      } else {
+        const e = await r.json();
+        log('error', `Enhanced combiner failed: ${e.detail || r.statusText}`);
+      }
+    } catch(e) {
+      log('error', `Enhanced combiner error: ${e}`);
+    }
+    setEnhancedCombinerRunning(false);
+  };
+
+  const downloadEnhancedPDF = async (modelId: string) => {
+    try {
+      log('info', `Generating enhanced PDF for ${modelId}...`);
+      const r = await fetch(`${API_URL}/api/enhanced/export-pdf`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model_id: modelId, universe, top_n: topN, include_context: true })
+      });
+      if (r.ok) {
+        const b = await r.blob();
+        const u = URL.createObjectURL(b);
+        const a = document.createElement('a');
+        a.href = u;
+        a.download = `${modelId}_enhanced_report.pdf`;
+        a.click();
+        URL.revokeObjectURL(u);
+        log('success', 'Enhanced PDF downloaded');
+      } else {
+        log('error', 'Failed to generate enhanced PDF');
+      }
+    } catch(e) {
+      log('error', `Enhanced PDF error: ${e}`);
+    }
+  };
+
+  // Model Validation functions
+  const runModelValidation = async () => {
+    if (!validationModel) { log('error', 'Please select a model'); return; }
+    setValidationRunning(true);
+    log('info', `Validating model: ${validationModel}...`);
+    try {
+      const r = await fetch(`${API_URL}/api/enhanced/validate-model`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model_id: validationModel,
+          universe: validationUniverse,
+          holding_period: validationHoldingPeriod,
+          n_simulations: 50
+        })
+      });
+      if (r.ok) {
+        const d = await r.json();
+        setValidationResults(d);
+        log('success', `Validation complete: ${d.validation?.verdict?.verdict || 'Done'}`);
+      } else {
+        const e = await r.json();
+        log('error', `Validation failed: ${e.detail || r.statusText}`);
+      }
+    } catch(e) {
+      log('error', `Validation error: ${e}`);
+    }
+    setValidationRunning(false);
+  };
+
+  const runValidateAllModels = async () => {
+    setValidationAllRunning(true);
+    log('info', 'Validating all models (this may take a while)...');
+    try {
+      const r = await fetch(`${API_URL}/api/enhanced/validate-all-models?universe=${validationUniverse}&holding_period=${validationHoldingPeriod}&n_simulations=30`);
+      if (r.ok) {
+        const d = await r.json();
+        setValidationAllResults(d);
+        log('success', `Validated ${d.models_tested} models. Top: ${d.top_models?.join(', ') || 'None'}`);
+      } else {
+        const e = await r.json();
+        log('error', `Validation failed: ${e.detail || r.statusText}`);
+      }
+    } catch(e) {
+      log('error', `Validation error: ${e}`);
+    }
+    setValidationAllRunning(false);
   };
 
   // Scheduled Scans functions
@@ -1487,10 +1624,16 @@ export default function Home() {
                 <div>
                   <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', fontWeight: 'bold' }}>Index</label>
                   <select style={{ ...S.select, width: '150px' }} value={marketRegimeIndex} onChange={e => setMarketRegimeIndex(e.target.value)}>
-                    <option value="SPY">SPY (S&P 500)</option>
-                    <option value="QQQ">QQQ (Nasdaq)</option>
-                    <option value="IWM">IWM (Russell 2000)</option>
-                    <option value="DIA">DIA (Dow Jones)</option>
+                    <optgroup label="US Markets">
+                      <option value="SPY">SPY (S&P 500)</option>
+                      <option value="QQQ">QQQ (Nasdaq)</option>
+                      <option value="IWM">IWM (Russell 2000)</option>
+                      <option value="DIA">DIA (Dow Jones)</option>
+                    </optgroup>
+                    <optgroup label="Thai Markets">
+                      <option value="SET.BK">SET Index</option>
+                      <option value="^SET.BK">SET (Alt)</option>
+                    </optgroup>
                   </select>
                 </div>
                 <div>
@@ -1663,6 +1806,250 @@ export default function Home() {
                       </div>
                     </div>
                   ))}
+                </div>
+              )}
+            </div>
+            
+            {/* Enhanced Signal Combiner */}
+            <div style={S.card}>
+              <h2 style={{ marginTop: 0 }}>🎯 Enhanced Signal Combiner</h2>
+              <p style={{ color: 'var(--muted-foreground)', marginBottom: '20px' }}>Select specific models, set weights, and combine signals with rich context explaining WHY each signal was generated.</p>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '15px', marginBottom: '20px' }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', fontWeight: 'bold' }}>Universe</label>
+                  <select style={{ ...S.select, width: '100%' }} value={enhancedCombinerUniverse} onChange={e => setEnhancedCombinerUniverse(e.target.value)}>
+                    <optgroup label="Built-in">{universes.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}</optgroup>
+                    {customUniverses.length > 0 && <optgroup label="Custom">{customUniverses.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}</optgroup>}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', fontWeight: 'bold' }}>Combine Method</label>
+                  <select style={{ ...S.select, width: '100%' }} value={enhancedCombinerMethod} onChange={e => setEnhancedCombinerMethod(e.target.value)}>
+                    <option value="weighted">Weighted Average</option>
+                    <option value="majority">Majority Vote</option>
+                    <option value="unanimous">Unanimous Only</option>
+                    <option value="any">Any Signal</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', fontWeight: 'bold' }}>Min Models</label>
+                  <input type="number" style={S.input} value={enhancedCombinerMinModels} onChange={e => setEnhancedCombinerMinModels(Number(e.target.value))} min={1} max={10} />
+                </div>
+                <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+                  <button style={{ ...S.btn('primary'), width: '100%' }} onClick={runEnhancedCombiner} disabled={enhancedCombinerRunning}>
+                    {enhancedCombinerRunning ? '⏳ Running...' : '▶ Combine Signals'}
+                  </button>
+                </div>
+              </div>
+              
+              {/* Model Selection */}
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'block', marginBottom: '10px', fontSize: '13px', fontWeight: 'bold' }}>Select Models (leave empty for all)</label>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                  {models.map(m => (
+                    <button
+                      key={m.id}
+                      style={{
+                        padding: '5px 12px',
+                        borderRadius: 'var(--radius)',
+                        border: '1px solid var(--border)',
+                        background: enhancedCombinerModels.includes(m.id) ? 'var(--primary)' : 'transparent',
+                        color: enhancedCombinerModels.includes(m.id) ? 'white' : 'var(--foreground)',
+                        cursor: 'pointer',
+                        fontSize: '12px'
+                      }}
+                      onClick={() => {
+                        if (enhancedCombinerModels.includes(m.id)) {
+                          setEnhancedCombinerModels(enhancedCombinerModels.filter(id => id !== m.id));
+                        } else {
+                          setEnhancedCombinerModels([...enhancedCombinerModels, m.id]);
+                        }
+                      }}
+                    >
+                      {m.name}
+                    </button>
+                  ))}
+                </div>
+                {enhancedCombinerModels.length > 0 && (
+                  <button style={{ marginTop: '10px', fontSize: '11px', color: 'var(--muted-foreground)', background: 'none', border: 'none', cursor: 'pointer' }} onClick={() => setEnhancedCombinerModels([])}>
+                    Clear selection
+                  </button>
+                )}
+              </div>
+              
+              {/* Results */}
+              {enhancedCombinerResults && (
+                <div style={{ marginTop: '20px', padding: '15px', background: 'var(--muted)', borderRadius: 'var(--radius)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                    <h4 style={{ margin: 0 }}>Results: {enhancedCombinerResults.buy_count} Buy, {enhancedCombinerResults.sell_count} Sell ({enhancedCombinerResults.models_used} models)</h4>
+                    <span style={{ padding: '4px 10px', borderRadius: '4px', background: enhancedCombinerResults.market_regime === 'BULL' ? '#22c55e' : enhancedCombinerResults.market_regime === 'BEAR' ? '#ef4444' : '#f59e0b', color: 'white', fontSize: '12px', fontWeight: 'bold' }}>
+                      {enhancedCombinerResults.market_regime}
+                    </span>
+                  </div>
+                  
+                  {enhancedCombinerResults.signals && enhancedCombinerResults.signals.length > 0 && (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '10px' }}>
+                      {enhancedCombinerResults.signals.map((s: any, i: number) => (
+                        <div key={i} style={{ background: 'white', padding: '12px', borderRadius: '8px', borderLeft: `4px solid ${s.final_signal === 'BUY' ? '#22c55e' : '#ef4444'}` }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                            <span style={{ fontWeight: 'bold', fontSize: '14px' }}>{s.ticker}</span>
+                            <span style={{ padding: '2px 8px', borderRadius: '4px', background: s.final_signal === 'BUY' ? '#dcfce7' : '#fee2e2', color: s.final_signal === 'BUY' ? '#166534' : '#991b1b', fontSize: '11px', fontWeight: 'bold' }}>
+                              {s.final_signal}
+                            </span>
+                          </div>
+                          <div style={{ fontSize: '12px', color: 'var(--muted-foreground)' }}>
+                            <div>Confidence: {s.confidence}% ({s.confidence_label})</div>
+                            <div>Models: {s.agreeing_models?.join(', ')}</div>
+                          </div>
+                          {s.enhanced_context?.primary_reasons && s.enhanced_context.primary_reasons.length > 0 && (
+                            <div style={{ marginTop: '8px', fontSize: '11px', padding: '8px', background: '#f8fafc', borderRadius: '4px' }}>
+                              <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>📌 Why:</div>
+                              {s.enhanced_context.primary_reasons.slice(0, 2).map((r: any, j: number) => (
+                                <div key={j}>• {r.factor}: {r.description}</div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            
+            {/* Model Validation */}
+            <div style={S.card}>
+              <h2 style={{ marginTop: 0 }}>📊 Model Validation</h2>
+              <p style={{ color: 'var(--muted-foreground)', marginBottom: '20px' }}>Statistically prove which models actually work. Backtest signals and get win rates, Sharpe ratios, and statistical significance.</p>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '15px', marginBottom: '20px' }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', fontWeight: 'bold' }}>Model</label>
+                  <select style={{ ...S.select, width: '100%' }} value={validationModel} onChange={e => setValidationModel(e.target.value)}>
+                    <option value="">Select model...</option>
+                    {models.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', fontWeight: 'bold' }}>Universe</label>
+                  <select style={{ ...S.select, width: '100%' }} value={validationUniverse} onChange={e => setValidationUniverse(e.target.value)}>
+                    <optgroup label="Built-in">{universes.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}</optgroup>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', fontWeight: 'bold' }}>Holding Period (days)</label>
+                  <input type="number" style={S.input} value={validationHoldingPeriod} onChange={e => setValidationHoldingPeriod(Number(e.target.value))} min={1} max={252} />
+                </div>
+                <div style={{ display: 'flex', alignItems: 'flex-end', gap: '8px' }}>
+                  <button style={{ ...S.btn('primary'), flex: 1 }} onClick={runModelValidation} disabled={validationRunning}>
+                    {validationRunning ? '⏳...' : '▶ Validate'}
+                  </button>
+                  <button style={{ ...S.btn('secondary'), flex: 1 }} onClick={runValidateAllModels} disabled={validationAllRunning}>
+                    {validationAllRunning ? '⏳...' : '📊 All'}
+                  </button>
+                </div>
+              </div>
+              
+              {/* Single Model Validation Results */}
+              {validationResults && validationResults.validation && (
+                <div style={{ marginTop: '20px', padding: '15px', background: 'var(--muted)', borderRadius: 'var(--radius)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                    <h4 style={{ margin: 0 }}>{validationResults.model_id} Validation</h4>
+                    <span style={{ 
+                      padding: '4px 12px', 
+                      borderRadius: '4px', 
+                      background: validationResults.validation.verdict?.verdict === 'EXCELLENT' ? '#22c55e' : 
+                                  validationResults.validation.verdict?.verdict === 'GOOD' ? '#3b82f6' :
+                                  validationResults.validation.verdict?.verdict === 'MARGINAL' ? '#f59e0b' : '#ef4444',
+                      color: 'white', 
+                      fontSize: '12px', 
+                      fontWeight: 'bold' 
+                    }}>
+                      {validationResults.validation.verdict?.verdict || 'N/A'}
+                    </span>
+                  </div>
+                  
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', marginBottom: '15px' }}>
+                    <div style={{ background: 'white', padding: '10px', borderRadius: '6px', textAlign: 'center' }}>
+                      <div style={{ fontSize: '11px', color: 'var(--muted-foreground)' }}>Win Rate</div>
+                      <div style={{ fontSize: '18px', fontWeight: 'bold', color: (validationResults.validation.performance?.win_rate || 0) > 50 ? '#22c55e' : '#ef4444' }}>
+                        {(validationResults.validation.performance?.win_rate || 0).toFixed(1)}%
+                      </div>
+                    </div>
+                    <div style={{ background: 'white', padding: '10px', borderRadius: '6px', textAlign: 'center' }}>
+                      <div style={{ fontSize: '11px', color: 'var(--muted-foreground)' }}>Avg Return</div>
+                      <div style={{ fontSize: '18px', fontWeight: 'bold', color: (validationResults.validation.performance?.avg_return || 0) > 0 ? '#22c55e' : '#ef4444' }}>
+                        {(validationResults.validation.performance?.avg_return || 0).toFixed(2)}%
+                      </div>
+                    </div>
+                    <div style={{ background: 'white', padding: '10px', borderRadius: '6px', textAlign: 'center' }}>
+                      <div style={{ fontSize: '11px', color: 'var(--muted-foreground)' }}>Sharpe Ratio</div>
+                      <div style={{ fontSize: '18px', fontWeight: 'bold' }}>
+                        {(validationResults.validation.risk_metrics?.sharpe_ratio || 0).toFixed(2)}
+                      </div>
+                    </div>
+                    <div style={{ background: 'white', padding: '10px', borderRadius: '6px', textAlign: 'center' }}>
+                      <div style={{ fontSize: '11px', color: 'var(--muted-foreground)' }}>P-Value</div>
+                      <div style={{ fontSize: '18px', fontWeight: 'bold', color: (validationResults.validation.statistical_significance?.p_value || 1) < 0.05 ? '#22c55e' : '#f59e0b' }}>
+                        {(validationResults.validation.statistical_significance?.p_value || 0).toFixed(4)}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {validationResults.validation.verdict?.reasons && (
+                    <div style={{ fontSize: '12px', color: 'var(--muted-foreground)' }}>
+                      <strong>Analysis:</strong> {validationResults.validation.verdict.reasons.join(' • ')}
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {/* All Models Leaderboard */}
+              {validationAllResults && validationAllResults.leaderboard && (
+                <div style={{ marginTop: '20px', padding: '15px', background: 'var(--muted)', borderRadius: 'var(--radius)' }}>
+                  <h4 style={{ margin: '0 0 15px 0' }}>📊 Model Leaderboard ({validationAllResults.models_tested} models)</h4>
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                      <thead>
+                        <tr style={{ background: '#f8f9fa' }}>
+                          <th style={{ padding: '8px', textAlign: 'left' }}>Rank</th>
+                          <th style={{ padding: '8px', textAlign: 'left' }}>Model</th>
+                          <th style={{ padding: '8px', textAlign: 'center' }}>Verdict</th>
+                          <th style={{ padding: '8px', textAlign: 'right' }}>Win Rate</th>
+                          <th style={{ padding: '8px', textAlign: 'right' }}>Avg Return</th>
+                          <th style={{ padding: '8px', textAlign: 'right' }}>Sharpe</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {validationAllResults.leaderboard.slice(0, 10).map((m: any, i: number) => (
+                          <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
+                            <td style={{ padding: '8px', fontWeight: 'bold' }}>#{i + 1}</td>
+                            <td style={{ padding: '8px' }}>{m.model_id}</td>
+                            <td style={{ padding: '8px', textAlign: 'center' }}>
+                              <span style={{
+                                padding: '2px 8px',
+                                borderRadius: '4px',
+                                background: m.verdict === 'EXCELLENT' ? '#22c55e' : m.verdict === 'GOOD' ? '#3b82f6' : m.verdict === 'MARGINAL' ? '#f59e0b' : '#ef4444',
+                                color: 'white',
+                                fontSize: '10px',
+                                fontWeight: 'bold'
+                              }}>
+                                {m.verdict}
+                              </span>
+                            </td>
+                            <td style={{ padding: '8px', textAlign: 'right', color: (m.win_rate || 0) > 50 ? '#22c55e' : '#ef4444' }}>
+                              {(m.win_rate || 0).toFixed(1)}%
+                            </td>
+                            <td style={{ padding: '8px', textAlign: 'right', color: (m.avg_return || 0) > 0 ? '#22c55e' : '#ef4444' }}>
+                              {(m.avg_return || 0).toFixed(2)}%
+                            </td>
+                            <td style={{ padding: '8px', textAlign: 'right' }}>{(m.sharpe_ratio || 0).toFixed(2)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
             </div>

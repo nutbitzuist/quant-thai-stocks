@@ -11,6 +11,7 @@ from typing import Dict, List, Optional, Any
 from datetime import datetime
 import logging
 
+from fastapi.responses import Response
 from app.data.fetcher import get_fetcher
 from app.data.universe import get_tickers
 from app.services.enhanced_combiner import (
@@ -19,6 +20,7 @@ from app.services.enhanced_combiner import (
 from app.services.signal_context import get_signal_context_builder
 from app.services.market_regime import get_regime_detector
 from app.services.model_validation import ModelValidator, validate_model_historical
+from app.services.pdf_generator import get_pdf_generator
 from app.api.routes.models import ALL_MODELS
 
 logger = logging.getLogger(__name__)
@@ -495,4 +497,149 @@ async def validate_all_models(
         raise
     except Exception as e:
         logger.error(f"Error validating all models: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==================== ENHANCED PDF EXPORT ====================
+
+class EnhancedPDFRequest(BaseModel):
+    """Request for enhanced PDF with rich context"""
+    model_id: str = Field(..., description="Model ID")
+    universe: str = Field(default="sp50", description="Universe")
+    top_n: int = Field(default=10, description="Top N signals")
+    include_context: bool = Field(default=True, description="Include rich context")
+
+
+@router.post("/export-pdf")
+async def export_enhanced_pdf(request: EnhancedPDFRequest):
+    """
+    Export model results as enhanced PDF with rich context.
+    Includes: WHY signals were generated, risk factors, position suggestions.
+    """
+    try:
+        if request.model_id not in ALL_MODELS:
+            raise HTTPException(status_code=400, detail=f"Unknown model: {request.model_id}")
+        
+        logger.info(f"Generating enhanced PDF for {request.model_id}")
+        
+        # Get tickers
+        tickers = get_tickers(request.universe)
+        if not tickers:
+            raise HTTPException(status_code=400, detail=f"Unknown universe: {request.universe}")
+        
+        # Fetch data
+        fetcher = get_fetcher()
+        price_data = fetcher.get_bulk_price_data(tickers, period="1y")
+        fundamental_data = fetcher.get_bulk_fundamental_data(tickers)
+        
+        # Get market regime
+        market_regime = None
+        try:
+            index_data = fetcher.get_price_data("SPY", period="2y")
+            if index_data is not None and len(index_data) >= 252:
+                detector = get_regime_detector()
+                regime = detector.detect_regime(index_data)
+                market_regime = detector.to_dict(regime)
+        except Exception as e:
+            logger.warning(f"Could not get market regime: {e}")
+        
+        # Run model
+        model_class = ALL_MODELS[request.model_id]
+        model = model_class()
+        result = model.run(price_data, fundamental_data)
+        
+        # Build enhanced context for each signal
+        buy_signals = []
+        sell_signals = []
+        
+        if request.include_context:
+            context_builder = get_signal_context_builder()
+            context_builder.set_price_data(price_data)
+            if fundamental_data is not None:
+                context_builder.set_fundamental_data(fundamental_data)
+            if market_regime:
+                context_builder.set_market_regime(market_regime)
+            context_builder.set_model_results(request.model_id, result)
+            
+            for ranking in result.rankings[:request.top_n]:
+                signal_type = ranking.get('signal', 'HOLD')
+                if signal_type == 'HOLD':
+                    continue
+                
+                try:
+                    enhanced = context_builder.build_enhanced_signal(
+                        ticker=ranking['ticker'],
+                        signal_type=signal_type,
+                        score=ranking.get('score', 50),
+                        model_id=request.model_id,
+                        all_scores=[r.get('score', 50) for r in result.rankings]
+                    )
+                    
+                    signal_data = {
+                        'ticker': ranking['ticker'],
+                        'score': ranking.get('score', 0),
+                        'price_at_signal': ranking.get('price', 0),
+                        'enhanced_context': enhanced.to_dict() if enhanced else {}
+                    }
+                    
+                    if signal_type == 'BUY':
+                        buy_signals.append(signal_data)
+                    else:
+                        sell_signals.append(signal_data)
+                except Exception as e:
+                    logger.warning(f"Failed to build context for {ranking['ticker']}: {e}")
+                    signal_data = {
+                        'ticker': ranking['ticker'],
+                        'score': ranking.get('score', 0),
+                        'price_at_signal': ranking.get('price', 0),
+                        'enhanced_context': {}
+                    }
+                    if signal_type == 'BUY':
+                        buy_signals.append(signal_data)
+                    else:
+                        sell_signals.append(signal_data)
+        else:
+            # Without context
+            for ranking in result.rankings[:request.top_n]:
+                signal_type = ranking.get('signal', 'HOLD')
+                if signal_type == 'HOLD':
+                    continue
+                signal_data = {
+                    'ticker': ranking['ticker'],
+                    'score': ranking.get('score', 0),
+                    'price_at_signal': ranking.get('price', 0),
+                    'enhanced_context': {}
+                }
+                if signal_type == 'BUY':
+                    buy_signals.append(signal_data)
+                else:
+                    sell_signals.append(signal_data)
+        
+        # Generate PDF
+        pdf_generator = get_pdf_generator()
+        pdf_bytes = pdf_generator.generate_enhanced_signal_report(
+            model_name=model.name,
+            universe=request.universe,
+            buy_signals=buy_signals,
+            sell_signals=sell_signals,
+            market_regime=market_regime,
+            total_analyzed=len(tickers),
+            stocks_with_data=result.stocks_with_data,
+            description=model.description
+        )
+        
+        filename = f"{request.model_id}_{request.universe}_enhanced_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+        
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f"attachment; filename={filename}"
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error generating enhanced PDF: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))

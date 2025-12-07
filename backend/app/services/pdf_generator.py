@@ -860,6 +860,205 @@ class PDFReportGenerator:
         buffer.seek(0)
         return buffer.getvalue()
 
+    def generate_enhanced_signal_report(
+        self,
+        model_name: str,
+        universe: str,
+        buy_signals: List[Dict],
+        sell_signals: List[Dict],
+        enhanced_context: Dict = None,
+        market_regime: Dict = None,
+        total_analyzed: int = 0,
+        stocks_with_data: int = 0,
+        description: str = "",
+        parameters: Dict = None
+    ) -> bytes:
+        """
+        Generate an enhanced PDF report with rich signal context
+        Includes: WHY signals were generated, risk factors, confirmations, position suggestions
+        """
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=letter,
+            rightMargin=0.75*inch,
+            leftMargin=0.75*inch,
+            topMargin=0.75*inch,
+            bottomMargin=0.75*inch
+        )
+        
+        story = []
+        bangkok_tz = pytz.timezone('Asia/Bangkok')
+        generated_time = datetime.now(bangkok_tz).strftime('%Y-%m-%d %H:%M:%S ICT')
+        
+        # Title
+        story.append(Paragraph(f"📈 {model_name}", self.styles['CustomTitle']))
+        story.append(Paragraph(f"Enhanced Signal Report • {universe.upper()}", self.styles['SubTitle']))
+        story.append(Spacer(1, 5))
+        story.append(Paragraph(f"Generated: {generated_time}", self.styles['SmallText']))
+        story.append(Spacer(1, 15))
+        story.append(HRFlowable(width="100%", thickness=2, color=self.colors['primary']))
+        story.append(Spacer(1, 20))
+        
+        # Market Regime Section (if available)
+        if market_regime:
+            story.append(Paragraph("📊 Market Regime", self.styles['SectionHeader']))
+            regime = market_regime.get('regime', 'UNKNOWN')
+            regime_color = self.colors['success'] if regime == 'BULL' else self.colors['destructive'] if regime == 'BEAR' else colors.HexColor('#f59e0b')
+            
+            regime_data = [
+                ['Regime', 'Trend', 'Volatility', 'Risk', 'Exposure'],
+                [
+                    regime,
+                    market_regime.get('trend_strength', 'N/A'),
+                    market_regime.get('volatility_regime', 'N/A'),
+                    market_regime.get('risk_level', 'N/A'),
+                    f"{market_regime.get('recommended_exposure', 0)}%"
+                ]
+            ]
+            regime_table = Table(regime_data, colWidths=[1.2*inch, 1.2*inch, 1.2*inch, 1*inch, 1*inch])
+            regime_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), self.colors['primary']),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, -1), 10),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('GRID', (0, 0), (-1, -1), 0.5, self.colors['border']),
+                ('BACKGROUND', (0, 1), (0, 1), regime_color),
+                ('TEXTCOLOR', (0, 1), (0, 1), colors.white),
+                ('FONTNAME', (0, 1), (0, 1), 'Helvetica-Bold'),
+                ('TOPPADDING', (0, 0), (-1, -1), 8),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+            ]))
+            story.append(regime_table)
+            
+            if market_regime.get('recommendation'):
+                story.append(Spacer(1, 10))
+                story.append(Paragraph(f"<b>💡 Recommendation:</b> {market_regime['recommendation']}", self.styles['BodyText']))
+            story.append(Spacer(1, 20))
+        
+        # Summary Stats
+        story.append(Paragraph("📋 Summary", self.styles['SectionHeader']))
+        summary_data = [
+            ['Metric', 'Value'],
+            ['Buy Signals', str(len(buy_signals))],
+            ['Sell Signals', str(len(sell_signals))],
+            ['Stocks Analyzed', f"{stocks_with_data} / {total_analyzed}"],
+        ]
+        summary_table = Table(summary_data, colWidths=[2.5*inch, 2*inch])
+        summary_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), self.colors['primary']),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('GRID', (0, 0), (-1, -1), 0.5, self.colors['border']),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [self.colors['background'], self.colors['muted']]),
+            ('TOPPADDING', (0, 0), (-1, -1), 8),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ]))
+        story.append(summary_table)
+        story.append(Spacer(1, 20))
+        
+        # Buy Signals with Enhanced Context
+        if buy_signals:
+            story.append(Paragraph("🟢 Buy Signals", self.styles['SectionHeader']))
+            
+            for i, signal in enumerate(buy_signals[:10], 1):
+                ticker = signal.get('ticker', '').replace('.BK', '')
+                score = signal.get('score', 0)
+                price = signal.get('price_at_signal', 0)
+                context = signal.get('enhanced_context', {})
+                
+                # Signal header
+                story.append(Paragraph(f"<b>#{i} {ticker}</b> - Score: {score:.1f} | Price: ${price:.2f}", self.styles['SubHeader']))
+                
+                # Why this signal (reasons)
+                reasons = context.get('primary_reasons', [])
+                if reasons:
+                    story.append(Paragraph("<b>📌 Why This Signal:</b>", self.styles['BodyText']))
+                    for reason in reasons[:3]:
+                        factor = reason.get('factor', '')
+                        desc = reason.get('description', '')
+                        story.append(Paragraph(f"• <b>{factor}:</b> {desc}", self.styles['SmallText']))
+                
+                # Risk factors
+                risks = context.get('risk_factors', [])
+                if risks:
+                    story.append(Spacer(1, 5))
+                    story.append(Paragraph("<b>⚠️ Risk Factors:</b>", self.styles['BodyText']))
+                    for risk in risks[:3]:
+                        factor = risk.get('factor', '')
+                        level = risk.get('level', '')
+                        story.append(Paragraph(f"• {factor} ({level})", self.styles['SmallText']))
+                
+                # Position suggestion
+                position = context.get('position_suggestion', {})
+                if position:
+                    story.append(Spacer(1, 5))
+                    conviction = position.get('conviction', 'N/A')
+                    portfolio_pct = position.get('portfolio_pct', 0)
+                    stop_loss = position.get('stop_loss_pct', 0)
+                    take_profit = position.get('take_profit_pct', 0)
+                    story.append(Paragraph(
+                        f"<b>💼 Position:</b> {portfolio_pct}% of portfolio | Conviction: {conviction} | Stop: {stop_loss}% | Target: +{take_profit}%",
+                        self.styles['SmallText']
+                    ))
+                
+                story.append(Spacer(1, 15))
+                story.append(HRFlowable(width="80%", thickness=0.5, color=self.colors['border']))
+                story.append(Spacer(1, 10))
+        
+        # Sell Signals with Enhanced Context
+        if sell_signals:
+            story.append(Paragraph("🔴 Sell Signals", self.styles['SectionHeader']))
+            
+            for i, signal in enumerate(sell_signals[:10], 1):
+                ticker = signal.get('ticker', '').replace('.BK', '')
+                score = signal.get('score', 0)
+                price = signal.get('price_at_signal', 0)
+                context = signal.get('enhanced_context', {})
+                
+                # Signal header
+                story.append(Paragraph(f"<b>#{i} {ticker}</b> - Score: {score:.1f} | Price: ${price:.2f}", self.styles['SubHeader']))
+                
+                # Why this signal
+                reasons = context.get('primary_reasons', [])
+                if reasons:
+                    story.append(Paragraph("<b>📌 Why This Signal:</b>", self.styles['BodyText']))
+                    for reason in reasons[:3]:
+                        factor = reason.get('factor', '')
+                        desc = reason.get('description', '')
+                        story.append(Paragraph(f"• <b>{factor}:</b> {desc}", self.styles['SmallText']))
+                
+                # Risk factors
+                risks = context.get('risk_factors', [])
+                if risks:
+                    story.append(Spacer(1, 5))
+                    story.append(Paragraph("<b>⚠️ Risk Factors:</b>", self.styles['BodyText']))
+                    for risk in risks[:3]:
+                        factor = risk.get('factor', '')
+                        level = risk.get('level', '')
+                        story.append(Paragraph(f"• {factor} ({level})", self.styles['SmallText']))
+                
+                story.append(Spacer(1, 15))
+                story.append(HRFlowable(width="80%", thickness=0.5, color=self.colors['border']))
+                story.append(Spacer(1, 10))
+        
+        # Footer
+        story.append(Spacer(1, 40))
+        story.append(HRFlowable(width="100%", thickness=1, color=self.colors['border']))
+        story.append(Spacer(1, 12))
+        footer_text = f"""
+        <b>📈 Quant Stock Analysis v2 - Enhanced Report</b><br/>
+        Generated on {generated_time}
+        """
+        story.append(Paragraph(footer_text, self.styles['FooterText']))
+        
+        doc.build(story)
+        buffer.seek(0)
+        return buffer.getvalue()
+
 
 # Singleton instance
 _pdf_generator = None
