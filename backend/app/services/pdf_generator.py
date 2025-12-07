@@ -102,6 +102,17 @@ class PDFReportGenerator:
             'leading': 13
         })
         
+        # SubTitle style for report subtitles
+        safe_add_style('SubTitle', {
+            'parent': self.styles['Normal'],
+            'fontName': 'Helvetica',
+            'fontSize': 14,
+            'spaceAfter': 8,
+            'textColor': self.colors['muted_foreground'],
+            'alignment': TA_LEFT,
+            'leading': 18
+        })
+        
         # Footer style
         safe_add_style('FooterText', {
             'parent': self.styles['Normal'],
