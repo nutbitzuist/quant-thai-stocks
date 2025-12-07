@@ -469,12 +469,12 @@ async def validate_all_models(
                     "model_name": metrics.model_name,
                     "verdict": result_dict["verdict"]["verdict"],
                     "score": result_dict["verdict"]["score"],
-                    "win_rate": metrics.win_rate,
-                    "avg_return": metrics.avg_return,
-                    "sharpe_ratio": metrics.sharpe_ratio,
-                    "is_significant": metrics.is_significant,
-                    "alpha": metrics.alpha,
-                    "total_signals": metrics.total_signals,
+                    "win_rate": float(metrics.win_rate),
+                    "avg_return": float(metrics.avg_return),
+                    "sharpe_ratio": float(metrics.sharpe_ratio),
+                    "is_significant": bool(metrics.is_significant),
+                    "alpha": float(metrics.alpha),
+                    "total_signals": int(metrics.total_signals),
                 })
                 
             except Exception as e:

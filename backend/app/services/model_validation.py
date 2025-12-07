@@ -113,12 +113,12 @@ class ValidationMetrics:
                 "calmar_ratio": round(self.calmar_ratio, 2),
             },
             "statistical_significance": {
-                "t_statistic": round(self.t_statistic, 3),
-                "p_value": round(self.p_value, 4),
-                "is_significant": self.is_significant,
+                "t_statistic": round(float(self.t_statistic), 3),
+                "p_value": round(float(self.p_value), 4),
+                "is_significant": bool(self.is_significant),
                 "confidence_interval_95": [
-                    round(self.confidence_interval[0], 2),
-                    round(self.confidence_interval[1], 2)
+                    round(float(self.confidence_interval[0]), 2),
+                    round(float(self.confidence_interval[1]), 2)
                 ],
             },
             "consistency": {

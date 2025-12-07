@@ -131,6 +131,9 @@ const S = {
 
 export default function Home() {
   const [tab, setTab] = useState<'models'|'advanced'|'backtest'|'universe'|'model-detail'|'history'|'status'|'settings'>('models');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [modelSubTab, setModelSubTab] = useState<'all'|'technical'|'fundamental'|'quantitative'>('all');
+  const [advancedSubTab, setAdvancedSubTab] = useState<'combiner'|'enhanced-combiner'|'sector'|'regime'|'validation'|'scheduled'>('combiner');
   const [models, setModels] = useState<Model[]>([]);
   const [results, setResults] = useState<Record<string, ModelResult>>({});
   const [running, setRunning] = useState<string|null>(null);
@@ -484,6 +487,62 @@ export default function Home() {
       }
     } catch(e) {
       log('error', `Enhanced PDF error: ${e}`);
+    }
+  };
+
+  // Download PDF for Enhanced Combiner results
+  const downloadEnhancedCombinerPDF = async () => {
+    if (!enhancedCombinerResults) { log('error', 'No results to export'); return; }
+    try {
+      log('info', 'Generating Enhanced Combiner PDF...');
+      const r = await fetch(`${API_URL}/api/enhanced/export-pdf`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          model_id: 'enhanced_combiner', 
+          universe: enhancedCombinerUniverse, 
+          top_n: 20, 
+          include_context: true,
+          combined_results: enhancedCombinerResults
+        })
+      });
+      if (r.ok) {
+        const b = await r.blob();
+        const u = URL.createObjectURL(b);
+        const a = document.createElement('a');
+        a.href = u;
+        a.download = `enhanced_combiner_${enhancedCombinerUniverse}_${new Date().toISOString().split('T')[0]}.pdf`;
+        a.click();
+        URL.revokeObjectURL(u);
+        log('success', 'Enhanced Combiner PDF downloaded');
+      } else {
+        log('error', 'Failed to generate Enhanced Combiner PDF');
+      }
+    } catch(e) {
+      log('error', `Enhanced Combiner PDF error: ${e}`);
+    }
+  };
+
+  // Download PDF for Market Regime results
+  const downloadMarketRegimePDF = async () => {
+    if (!marketRegimeResults) { log('error', 'No results to export'); return; }
+    try {
+      log('info', 'Generating Market Regime PDF...');
+      const r = await fetch(`${API_URL}/api/advanced/market-regime/pdf?index=${marketRegimeIndex}&universe=${marketRegimeUniverse}`);
+      if (r.ok) {
+        const b = await r.blob();
+        const u = URL.createObjectURL(b);
+        const a = document.createElement('a');
+        a.href = u;
+        a.download = `market_regime_${marketRegimeIndex}_${new Date().toISOString().split('T')[0]}.pdf`;
+        a.click();
+        URL.revokeObjectURL(u);
+        log('success', 'Market Regime PDF downloaded');
+      } else {
+        log('error', 'Failed to generate Market Regime PDF');
+      }
+    } catch(e) {
+      log('error', `Market Regime PDF error: ${e}`);
     }
   };
 
@@ -947,30 +1006,167 @@ export default function Home() {
     }
   }, [tab]);
 
+  // Sidebar menu items
+  const mainMenuItems = [
+    { id: 'models', icon: '📚', label: 'Models' },
+    { id: 'advanced', icon: '⚡', label: 'Advanced' },
+    { id: 'backtest', icon: '📊', label: 'Backtest' },
+    { id: 'universe', icon: '🌐', label: 'Universe' },
+    { id: 'model-detail', icon: '📖', label: 'Model Details' },
+    { id: 'history', icon: '📜', label: 'History' },
+    { id: 'status', icon: '🔧', label: 'Status' },
+    { id: 'settings', icon: '⚙️', label: 'Settings' },
+  ] as const;
+
+  const modelSubMenuItems = [
+    { id: 'all', label: 'All Models' },
+    { id: 'technical', label: 'Technical Models' },
+    { id: 'fundamental', label: 'Fundamental Models' },
+    { id: 'quantitative', label: 'Quantitative Models' },
+  ] as const;
+
+  const advancedSubMenuItems = [
+    { id: 'combiner', label: 'Signal Combiner' },
+    { id: 'enhanced-combiner', label: 'Enhanced Combiner' },
+    { id: 'sector', label: 'Sector Rotation' },
+    { id: 'regime', label: 'Market Regime' },
+    { id: 'validation', label: 'Model Validation' },
+    { id: 'scheduled', label: 'Scheduled Scans' },
+  ] as const;
+
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--background)', color: 'var(--foreground)' }}>
-      {/* Header */}
-      <div style={{ background: 'var(--card)', borderBottom: '1px solid var(--border)', padding: '1rem 1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: 'var(--shadow-sm)' }}>
-        <div><h1 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '600', color: 'var(--foreground)' }}>📈 Quant Stock Analysis v2.0.2</h1></div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <span style={S.dot(connected)} />
-          <select style={{ ...S.select, background: 'var(--background)' }} value={universe} onChange={e => setUniverse(e.target.value)}>
-            <optgroup label="Built-in">{universes.map(u => <option key={u.id} value={u.id}>{u.name} ({u.count})</option>)}</optgroup>
-            {customUniverses.length > 0 && <optgroup label="Custom">{customUniverses.map(u => <option key={u.id} value={u.id}>{u.name} ({u.count})</option>)}</optgroup>}
-          </select>
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <div style={{ display: 'flex', gap: '0.5rem', background: 'var(--card)', padding: '0.75rem 1.25rem', borderBottom: '1px solid var(--border)', flexWrap: 'wrap' }}>
-        {(['models', 'advanced', 'backtest', 'universe', 'model-detail', 'history', 'status', 'settings'] as const).map(t => (
-          <button key={t} style={S.tab(tab === t)} onClick={() => setTab(t)}>
-            {t === 'models' ? '📚 Models' : t === 'advanced' ? '⚡ Advanced' : t === 'backtest' ? '📊 Backtest' : t === 'universe' ? '🌐 Universe' : t === 'model-detail' ? '📖 Model Details' : t === 'history' ? '📜 History' : t === 'status' ? '🔧 Status' : '⚙️ Settings'}
+    <div style={{ minHeight: '100vh', background: 'var(--background)', color: 'var(--foreground)', display: 'flex' }}>
+      {/* Sidebar */}
+      <div style={{ 
+        width: sidebarCollapsed ? '60px' : '220px', 
+        background: 'var(--card)', 
+        borderRight: '1px solid var(--border)', 
+        display: 'flex', 
+        flexDirection: 'column',
+        transition: 'width 0.2s ease',
+        flexShrink: 0,
+        height: '100vh',
+        position: 'sticky',
+        top: 0,
+        overflowY: 'auto'
+      }}>
+        {/* Sidebar Header */}
+        <div style={{ padding: '1rem', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          {!sidebarCollapsed && <span style={{ fontWeight: '600', fontSize: '0.9rem' }}>📈 Quant v2.0.2</span>}
+          <button 
+            onClick={() => setSidebarCollapsed(!sidebarCollapsed)} 
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', fontSize: '1.2rem', color: 'var(--muted-foreground)' }}
+            title={sidebarCollapsed ? 'Expand' : 'Collapse'}
+          >
+            {sidebarCollapsed ? '→' : '←'}
           </button>
-        ))}
+        </div>
+
+        {/* Connection Status */}
+        <div style={{ padding: '0.75rem 1rem', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <span style={S.dot(connected)} />
+          {!sidebarCollapsed && <span style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>{connected ? 'Connected' : 'Disconnected'}</span>}
+        </div>
+
+        {/* Main Menu */}
+        <div style={{ flex: 1, padding: '0.5rem' }}>
+          {mainMenuItems.map(item => (
+            <div key={item.id}>
+              <button
+                onClick={() => setTab(item.id)}
+                style={{
+                  width: '100%',
+                  padding: sidebarCollapsed ? '0.75rem' : '0.6rem 0.75rem',
+                  background: tab === item.id ? 'var(--primary)' : 'transparent',
+                  color: tab === item.id ? 'var(--primary-foreground)' : 'var(--foreground)',
+                  border: 'none',
+                  borderRadius: 'var(--radius)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  fontSize: '0.875rem',
+                  fontWeight: tab === item.id ? '600' : '400',
+                  marginBottom: '2px',
+                  justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
+                  transition: 'all 0.15s ease'
+                }}
+                title={sidebarCollapsed ? item.label : undefined}
+              >
+                <span>{item.icon}</span>
+                {!sidebarCollapsed && <span>{item.label}</span>}
+              </button>
+
+              {/* Sub-menu for Models */}
+              {item.id === 'models' && tab === 'models' && !sidebarCollapsed && (
+                <div style={{ marginLeft: '1rem', marginTop: '4px', marginBottom: '8px' }}>
+                  {modelSubMenuItems.map(sub => (
+                    <button
+                      key={sub.id}
+                      onClick={() => setModelSubTab(sub.id)}
+                      style={{
+                        width: '100%',
+                        padding: '0.4rem 0.6rem',
+                        background: modelSubTab === sub.id ? 'var(--muted)' : 'transparent',
+                        color: modelSubTab === sub.id ? 'var(--foreground)' : 'var(--muted-foreground)',
+                        border: 'none',
+                        borderRadius: 'var(--radius)',
+                        cursor: 'pointer',
+                        fontSize: '0.8rem',
+                        textAlign: 'left',
+                        marginBottom: '2px'
+                      }}
+                    >
+                      {sub.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Sub-menu for Advanced */}
+              {item.id === 'advanced' && tab === 'advanced' && !sidebarCollapsed && (
+                <div style={{ marginLeft: '1rem', marginTop: '4px', marginBottom: '8px' }}>
+                  {advancedSubMenuItems.map(sub => (
+                    <button
+                      key={sub.id}
+                      onClick={() => setAdvancedSubTab(sub.id)}
+                      style={{
+                        width: '100%',
+                        padding: '0.4rem 0.6rem',
+                        background: advancedSubTab === sub.id ? 'var(--muted)' : 'transparent',
+                        color: advancedSubTab === sub.id ? 'var(--foreground)' : 'var(--muted-foreground)',
+                        border: 'none',
+                        borderRadius: 'var(--radius)',
+                        cursor: 'pointer',
+                        fontSize: '0.8rem',
+                        textAlign: 'left',
+                        marginBottom: '2px'
+                      }}
+                    >
+                      {sub.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* Universe Selector at bottom */}
+        {!sidebarCollapsed && (
+          <div style={{ padding: '0.75rem', borderTop: '1px solid var(--border)' }}>
+            <label style={{ fontSize: '0.7rem', color: 'var(--muted-foreground)', display: 'block', marginBottom: '4px' }}>Universe</label>
+            <select style={{ ...S.select, width: '100%', marginRight: 0, fontSize: '0.8rem' }} value={universe} onChange={e => setUniverse(e.target.value)}>
+              <optgroup label="Built-in">{universes.map(u => <option key={u.id} value={u.id}>{u.name} ({u.count})</option>)}</optgroup>
+              {customUniverses.length > 0 && <optgroup label="Custom">{customUniverses.map(u => <option key={u.id} value={u.id}>{u.name} ({u.count})</option>)}</optgroup>}
+            </select>
+          </div>
+        )}
       </div>
 
-      <div style={{ padding: '1.25rem', maxWidth: '1400px', margin: '0 auto' }}>
+      {/* Main Content */}
+      <div style={{ flex: 1, overflowY: 'auto', height: '100vh' }}>
+        <div style={{ padding: '1.25rem', maxWidth: '1400px', margin: '0 auto' }}>
         {/* Connection Warning */}
         {!connected && <div style={{ ...S.card, background: 'var(--accent)', borderLeft: '4px solid var(--primary)', color: 'var(--accent-foreground)' }}><h3 style={{ margin: '0 0 0.5rem 0' }}>⚠️ Backend Not Connected</h3><p style={{ margin: 0 }}>Make sure the backend is running and accessible.</p></div>}
 
@@ -1018,19 +1214,38 @@ export default function Home() {
             {!connected && <div style={{ ...S.card, background: 'var(--accent)', borderLeft: '4px solid var(--primary)', color: 'var(--accent-foreground)' }}><h3 style={{ margin: '0 0 0.5rem 0' }}>⚠️ Backend Not Connected</h3><p style={{ margin: 0 }}>Make sure the backend is running and accessible.</p></div>}
             {connected && (
               <>
-                <h2>Technical Models ({models.filter(m => m.category === 'Technical').length})</h2>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '15px', marginBottom: '30px' }}>
-                  {models.filter(m => m.category === 'Technical').map(m => <ModelCard key={m.id} model={m} result={results[m.id]} running={running === m.id} onRun={() => runModel(m.id)} onPDF={downloadPDF} onRunWithParams={(params) => runModelWithParams(m.id, params)} />)}
-                </div>
-                <h2 style={{ marginTop: '30px' }}>Fundamental Models ({models.filter(m => m.category === 'Fundamental').length})</h2>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '15px', marginBottom: '30px' }}>
-                  {models.filter(m => m.category === 'Fundamental').map(m => <ModelCard key={m.id} model={m} result={results[m.id]} running={running === m.id} onRun={() => runModel(m.id)} onPDF={downloadPDF} onRunWithParams={(params) => runModelWithParams(m.id, params)} />)}
-                </div>
-                <h2 style={{ marginTop: '30px' }}>Quantitative Models ({models.filter(m => m.category === 'Quantitative').length})</h2>
-                <p style={{ color: 'var(--muted-foreground)', marginBottom: '15px' }}>Statistical arbitrage and quantitative strategies</p>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '15px' }}>
-                  {models.filter(m => m.category === 'Quantitative').map(m => <ModelCard key={m.id} model={m} result={results[m.id]} running={running === m.id} onRun={() => runModel(m.id)} onPDF={downloadPDF} onRunWithParams={(params) => runModelWithParams(m.id, params)} />)}
-                </div>
+                {/* All Models or Technical */}
+                {(modelSubTab === 'all' || modelSubTab === 'technical') && (
+                  <>
+                    <h2>📊 Technical Models ({models.filter(m => m.category === 'Technical').length})</h2>
+                    <p style={{ color: 'var(--muted-foreground)', marginBottom: '15px' }}>Chart patterns, indicators, and price action strategies</p>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '15px', marginBottom: '30px' }}>
+                      {models.filter(m => m.category === 'Technical').map(m => <ModelCard key={m.id} model={m} result={results[m.id]} running={running === m.id} onRun={() => runModel(m.id)} onPDF={downloadPDF} onRunWithParams={(params) => runModelWithParams(m.id, params)} />)}
+                    </div>
+                  </>
+                )}
+                
+                {/* All Models or Fundamental */}
+                {(modelSubTab === 'all' || modelSubTab === 'fundamental') && (
+                  <>
+                    <h2 style={{ marginTop: modelSubTab === 'all' ? '30px' : '0' }}>💰 Fundamental Models ({models.filter(m => m.category === 'Fundamental').length})</h2>
+                    <p style={{ color: 'var(--muted-foreground)', marginBottom: '15px' }}>Value investing, quality metrics, and financial analysis</p>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '15px', marginBottom: '30px' }}>
+                      {models.filter(m => m.category === 'Fundamental').map(m => <ModelCard key={m.id} model={m} result={results[m.id]} running={running === m.id} onRun={() => runModel(m.id)} onPDF={downloadPDF} onRunWithParams={(params) => runModelWithParams(m.id, params)} />)}
+                    </div>
+                  </>
+                )}
+                
+                {/* All Models or Quantitative */}
+                {(modelSubTab === 'all' || modelSubTab === 'quantitative') && (
+                  <>
+                    <h2 style={{ marginTop: modelSubTab === 'all' ? '30px' : '0' }}>🔢 Quantitative Models ({models.filter(m => m.category === 'Quantitative').length})</h2>
+                    <p style={{ color: 'var(--muted-foreground)', marginBottom: '15px' }}>Statistical arbitrage and quantitative strategies</p>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '15px' }}>
+                      {models.filter(m => m.category === 'Quantitative').map(m => <ModelCard key={m.id} model={m} result={results[m.id]} running={running === m.id} onRun={() => runModel(m.id)} onPDF={downloadPDF} onRunWithParams={(params) => runModelWithParams(m.id, params)} />)}
+                    </div>
+                  </>
+                )}
               </>
             )}
           </>
@@ -1429,6 +1644,7 @@ export default function Home() {
         {tab === 'advanced' && (
           <>
             {/* Signal Combiner */}
+            {advancedSubTab === 'combiner' && (
             <div style={S.card}>
               <h2 style={{ marginTop: 0 }}>🔗 Signal Combiner</h2>
               <p style={{ color: 'var(--muted-foreground)', marginBottom: '20px' }}>Run multiple models and find stocks with confirmation from multiple signals. Higher confidence = better signals.</p>
@@ -1523,8 +1739,10 @@ export default function Home() {
                 </div>
               )}
             </div>
+            )}
             
             {/* Sector Rotation */}
+            {advancedSubTab === 'sector' && (
             <div style={S.card}>
               <h2 style={{ marginTop: 0 }}>🔄 Sector Rotation</h2>
               <p style={{ color: 'var(--muted-foreground)', marginBottom: '20px' }}>Identify which sectors are strongest/weakest for rotation strategies.</p>
@@ -1614,8 +1832,10 @@ export default function Home() {
                 </div>
               )}
             </div>
+            )}
             
             {/* Market Regime Detection */}
+            {advancedSubTab === 'regime' && (
             <div style={S.card}>
               <h2 style={{ marginTop: 0 }}>📊 Market Regime Detection</h2>
               <p style={{ color: 'var(--muted-foreground)', marginBottom: '20px' }}>Identify current market conditions (Bull/Bear/Neutral) to adjust your strategy accordingly.</p>
@@ -1649,6 +1869,12 @@ export default function Home() {
               
               {marketRegimeResults && (
                 <div style={{ marginTop: '20px' }}>
+                  {/* PDF Export Button */}
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '15px' }}>
+                    <button style={{ ...S.btn('primary'), fontSize: '12px', padding: '6px 12px' }} onClick={downloadMarketRegimePDF}>
+                      📄 Export PDF
+                    </button>
+                  </div>
                   {/* Regime Badge */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '20px' }}>
                     <div style={{
@@ -1701,8 +1927,10 @@ export default function Home() {
                 </div>
               )}
             </div>
+            )}
             
             {/* Scheduled Scans */}
+            {advancedSubTab === 'scheduled' && (
             <div style={S.card}>
               <h2 style={{ marginTop: 0 }}>⏰ Scheduled Scans</h2>
               <p style={{ color: 'var(--muted-foreground)', marginBottom: '20px' }}>Set up automatic daily scans to run models at specific times.</p>
@@ -1809,8 +2037,10 @@ export default function Home() {
                 </div>
               )}
             </div>
+            )}
             
             {/* Enhanced Signal Combiner */}
+            {advancedSubTab === 'enhanced-combiner' && (
             <div style={S.card}>
               <h2 style={{ marginTop: 0 }}>🎯 Enhanced Signal Combiner</h2>
               <p style={{ color: 'var(--muted-foreground)', marginBottom: '20px' }}>Select specific models, set weights, and combine signals with rich context explaining WHY each signal was generated.</p>
@@ -1883,9 +2113,14 @@ export default function Home() {
                 <div style={{ marginTop: '20px', padding: '15px', background: 'var(--muted)', borderRadius: 'var(--radius)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
                     <h4 style={{ margin: 0 }}>Results: {enhancedCombinerResults.buy_count} Buy, {enhancedCombinerResults.sell_count} Sell ({enhancedCombinerResults.models_used} models)</h4>
-                    <span style={{ padding: '4px 10px', borderRadius: '4px', background: enhancedCombinerResults.market_regime === 'BULL' ? '#22c55e' : enhancedCombinerResults.market_regime === 'BEAR' ? '#ef4444' : '#f59e0b', color: 'white', fontSize: '12px', fontWeight: 'bold' }}>
-                      {enhancedCombinerResults.market_regime}
-                    </span>
+                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                      <button style={{ ...S.btn('primary'), fontSize: '12px', padding: '6px 12px' }} onClick={downloadEnhancedCombinerPDF}>
+                        📄 Export PDF
+                      </button>
+                      <span style={{ padding: '4px 10px', borderRadius: '4px', background: enhancedCombinerResults.market_regime === 'BULL' ? '#22c55e' : enhancedCombinerResults.market_regime === 'BEAR' ? '#ef4444' : '#f59e0b', color: 'white', fontSize: '12px', fontWeight: 'bold' }}>
+                        {enhancedCombinerResults.market_regime}
+                      </span>
+                    </div>
                   </div>
                   
                   {enhancedCombinerResults.signals && enhancedCombinerResults.signals.length > 0 && (
@@ -1917,8 +2152,10 @@ export default function Home() {
                 </div>
               )}
             </div>
+            )}
             
             {/* Model Validation */}
+            {advancedSubTab === 'validation' && (
             <div style={S.card}>
               <h2 style={{ marginTop: 0 }}>📊 Model Validation</h2>
               <p style={{ color: 'var(--muted-foreground)', marginBottom: '20px' }}>Statistically prove which models actually work. Backtest signals and get win rates, Sharpe ratios, and statistical significance.</p>
@@ -2053,6 +2290,7 @@ export default function Home() {
                 </div>
               )}
             </div>
+            )}
             
           </>
         )}
@@ -2291,6 +2529,7 @@ export default function Home() {
             </div>
           </>
         )}
+        </div>
       </div>
     </div>
   );
