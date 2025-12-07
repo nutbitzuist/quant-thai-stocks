@@ -315,13 +315,9 @@ async def get_market_regime_pdf(
         result['index'] = index
         result['timestamp'] = datetime.now().isoformat()
         
-        # Calculate breadth if universe provided
+        # Add universe info if provided
         if universe:
-            tickers = get_tickers(universe)
-            if tickers:
-                price_data = fetcher.get_bulk_price_data(tickers, period="6mo")
-                breadth = detector.calculate_breadth(price_data)
-                result['breadth'] = breadth
+            result['universe'] = universe
         
         # Generate PDF
         pdf_generator = get_pdf_generator()
