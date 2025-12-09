@@ -293,7 +293,19 @@ interface AnalysisMetrics {
   profit_margin?: number;
   revenue_growth?: number;
   earnings_growth?: number;
+  // New Metrics
+  total_debt?: number;
+  debt_to_equity?: number;
+  current_ratio?: number;
+  free_cash_flow?: number;
+  operating_cash_flow?: number;
+  forward_pe?: number;
+  peg_ratio?: number;
+  target_mean_price?: number;
+  recommendation_key?: string;
+  num_analysts?: number;
 }
+
 
 interface AnalysisTechnicals {
   rsi?: number;
@@ -347,6 +359,12 @@ const StockAnalyzer = () => {
     setLoading(false);
   };
 
+  const downloadPdf = () => {
+    if (!data) return;
+    window.open(`${API_URL}/api/analysis/${data.ticker}/pdf`, '_blank');
+  };
+
+
   const getScoreColor = (score: number) => {
     if (score >= 80) return '#22c55e'; // Green
     if (score >= 60) return '#3b82f6'; // Blue
@@ -394,8 +412,8 @@ const StockAnalyzer = () => {
               {/* Score Gauge */}
               <div style={{ textAlign: 'center', position: 'relative', width: '150px', height: '150px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--muted)', borderRadius: '50%' }}>
                 <div style={{ position: 'absolute', width: '130px', height: '130px', borderRadius: '50%', border: `10px solid ${getScoreColor(data.score)}`, borderTopColor: 'transparent', transform: 'rotate(-45deg)', transition: 'all 1s ease' }}></div>
-                <div>
-                  <div style={{ fontSize: '3rem', fontWeight: 'bold', color: getScoreColor(data.score) }}>{data.score}</div>
+                <div style={{ zIndex: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{ fontSize: '3rem', fontWeight: 'bold', color: getScoreColor(data.score), lineHeight: 1 }}>{data.score}</div>
                   <div style={{ fontSize: '0.8rem', fontWeight: 'bold', textTransform: 'uppercase' }}>Quant Score</div>
                 </div>
               </div>
@@ -405,6 +423,12 @@ const StockAnalyzer = () => {
                 <div style={{ maxWidth: '300px', fontSize: '0.9rem', color: 'var(--muted-foreground)', marginTop: '5px' }}>
                   {data.summary}
                 </div>
+                <button
+                  onClick={downloadPdf}
+                  style={{ marginTop: '10px', background: 'var(--primary)', color: 'var(--primary-foreground)', border: 'none', padding: '8px 16px', borderRadius: 'var(--radius)', cursor: 'pointer', fontSize: '0.9rem' }}
+                >
+                  ⬇️ Download PDF Report
+                </button>
               </div>
             </div>
 
@@ -433,16 +457,28 @@ const StockAnalyzer = () => {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
               <div>
                 <h3 style={{ borderBottom: '1px solid var(--border)', paddingBottom: '10px' }}>💰 Key Fundamentals</h3>
-                <table style={{ width: '100%', fontSize: '0.9rem', borderCollapse: 'collapse' }}>
-                  <tbody>
-                    <tr><td style={{ padding: '8px 0', color: 'var(--muted-foreground)' }}>Market Cap</td><td style={{ textAlign: 'right', fontWeight: 'bold' }}>{data.metrics.market_cap ? (data.metrics.market_cap / 1e9).toFixed(2) + 'B' : '-'}</td></tr>
-                    <tr><td style={{ padding: '8px 0', color: 'var(--muted-foreground)' }}>P/E Ratio</td><td style={{ textAlign: 'right', fontWeight: 'bold' }}>{data.metrics.pe_ratio?.toFixed(2) || '-'}</td></tr>
-                    <tr><td style={{ padding: '8px 0', color: 'var(--muted-foreground)' }}>P/B Ratio</td><td style={{ textAlign: 'right', fontWeight: 'bold' }}>{data.metrics.pb_ratio?.toFixed(2) || '-'}</td></tr>
-                    <tr><td style={{ padding: '8px 0', color: 'var(--muted-foreground)' }}>ROE</td><td style={{ textAlign: 'right', fontWeight: 'bold' }}>{data.metrics.roe ? (data.metrics.roe * 100).toFixed(2) + '%' : '-'}</td></tr>
-                    <tr><td style={{ padding: '8px 0', color: 'var(--muted-foreground)' }}>Profit Margin</td><td style={{ textAlign: 'right', fontWeight: 'bold' }}>{data.metrics.profit_margin ? (data.metrics.profit_margin * 100).toFixed(2) + '%' : '-'}</td></tr>
-                    <tr><td style={{ padding: '8px 0', color: 'var(--muted-foreground)' }}>Rev. Growth</td><td style={{ textAlign: 'right', fontWeight: 'bold' }}>{data.metrics.revenue_growth ? (data.metrics.revenue_growth * 100).toFixed(2) + '%' : '-'}</td></tr>
-                  </tbody>
-                </table>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                  <table style={{ width: '100%', fontSize: '0.9rem', borderCollapse: 'collapse' }}>
+                    <thead><tr><th colSpan={2} style={{ textAlign: 'left', paddingBottom: '5px', color: 'var(--primary)' }}>Valuation & Growth</th></tr></thead>
+                    <tbody>
+                      <tr><td style={{ padding: '4px 0', color: 'var(--muted-foreground)' }}>Market Cap</td><td style={{ textAlign: 'right', fontWeight: 'bold' }}>{data.metrics.market_cap ? (data.metrics.market_cap / 1e9).toFixed(2) + 'B' : '-'}</td></tr>
+                      <tr><td style={{ padding: '4px 0', color: 'var(--muted-foreground)' }}>P/E Ratio</td><td style={{ textAlign: 'right', fontWeight: 'bold' }}>{data.metrics.pe_ratio?.toFixed(2) || '-'}</td></tr>
+                      <tr><td style={{ padding: '4px 0', color: 'var(--muted-foreground)' }}>Forward P/E</td><td style={{ textAlign: 'right', fontWeight: 'bold' }}>{data.metrics.forward_pe?.toFixed(2) || '-'}</td></tr>
+                      <tr><td style={{ padding: '4px 0', color: 'var(--muted-foreground)' }}>PEG Ratio</td><td style={{ textAlign: 'right', fontWeight: 'bold' }}>{data.metrics.peg_ratio?.toFixed(2) || '-'}</td></tr>
+                      <tr><td style={{ padding: '4px 0', color: 'var(--muted-foreground)' }}>Rev. Growth</td><td style={{ textAlign: 'right', fontWeight: 'bold' }}>{data.metrics.revenue_growth ? (data.metrics.revenue_growth * 100).toFixed(2) + '%' : '-'}</td></tr>
+                    </tbody>
+                  </table>
+
+                  <table style={{ width: '100%', fontSize: '0.9rem', borderCollapse: 'collapse' }}>
+                    <thead><tr><th colSpan={2} style={{ textAlign: 'left', paddingBottom: '5px', color: 'var(--primary)' }}>Financial Health</th></tr></thead>
+                    <tbody>
+                      <tr><td style={{ padding: '4px 0', color: 'var(--muted-foreground)' }}>Total Debt</td><td style={{ textAlign: 'right', fontWeight: 'bold' }}>{data.metrics.total_debt ? (data.metrics.total_debt / 1e9).toFixed(2) + 'B' : '-'}</td></tr>
+                      <tr><td style={{ padding: '4px 0', color: 'var(--muted-foreground)' }}>Debt/Equity</td><td style={{ textAlign: 'right', fontWeight: 'bold' }}>{data.metrics.debt_to_equity?.toFixed(2) || '-'}</td></tr>
+                      <tr><td style={{ padding: '4px 0', color: 'var(--muted-foreground)' }}>Current Ratio</td><td style={{ textAlign: 'right', fontWeight: 'bold' }}>{data.metrics.current_ratio?.toFixed(2) || '-'}</td></tr>
+                      <tr><td style={{ padding: '4px 0', color: 'var(--muted-foreground)' }}>Free Cash Flow</td><td style={{ textAlign: 'right', fontWeight: 'bold' }}>{data.metrics.free_cash_flow ? (data.metrics.free_cash_flow / 1e9).toFixed(2) + 'B' : '-'}</td></tr>
+                    </tbody>
+                  </table>
+                </div>
               </div>
 
               <div>
