@@ -129,6 +129,156 @@ const S = {
   } as React.CSSProperties,
 };
 
+// Helper for market icons
+const getMarketIcon = (market: string) => {
+  if (market === 'US') return '🇺🇸';
+  if (market === 'Thailand') return '🇹🇭';
+  return '🌐';
+};
+
+const UniverseSelector = ({ 
+  current, 
+  universes, 
+  customUniverses, 
+  onChange,
+  sidebarCollapsed 
+}: { 
+  current: string; 
+  universes: any[]; 
+  customUniverses: any[];
+  onChange: (id: string) => void;
+  sidebarCollapsed: boolean;
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const selected = universes.find(u => u.id === current) || customUniverses.find(u => u.id === current) || universes[0];
+  
+  useEffect(() => {
+    const close = () => setIsOpen(false);
+    if (isOpen) window.addEventListener('click', close);
+    return () => window.removeEventListener('click', close);
+  }, [isOpen]);
+
+  if (sidebarCollapsed) {
+     return (
+        <div style={{ textAlign: 'center', cursor: 'pointer' }} onClick={() => setIsOpen(!isOpen)} title={`Universe: ${selected?.name}`}>
+            <span style={{ fontSize: '1.2rem' }}>{getMarketIcon(selected?.market)}</span>
+        </div>
+     )
+  }
+
+  return (
+    <div style={{ position: 'relative' }} onClick={e => e.stopPropagation()}>
+      <button 
+        onClick={() => setIsOpen(!isOpen)}
+        style={{
+            ...S.select,
+            width: '100%',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            cursor: 'pointer',
+            textAlign: 'left'
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
+            <span style={{ fontSize: '1.2rem' }}>{getMarketIcon(selected?.market)}</span>
+            <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                <span style={{ fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{selected?.name || 'Select Universe'}</span>
+                <span style={{ fontSize: '10px', color: 'var(--muted-foreground)' }}>{selected?.count || 0} companies</span>
+            </div>
+        </div>
+        <span style={{ fontSize: '0.7rem', color: 'var(--muted-foreground)' }}>▼</span>
+      </button>
+
+      {isOpen && (
+        <div style={{
+            position: 'absolute',
+            bottom: '100%',
+            left: 0,
+            width: '300px',
+            maxHeight: '400px',
+            overflowY: 'auto',
+            background: 'var(--card)',
+            color: 'var(--card-foreground)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius)',
+            boxShadow: 'var(--shadow-sm)',
+            marginBottom: '5px',
+            zIndex: 50,
+            padding: '8px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '4px'
+        }}>
+            <div style={{ padding: '8px 12px', fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>Built-in Universes</div>
+            {universes.map(u => (
+                <div 
+                    key={u.id}
+                    onClick={() => { onChange(u.id); setIsOpen(false); }}
+                    style={{
+                        padding: '10px',
+                        borderRadius: 'var(--radius)',
+                        cursor: 'pointer',
+                        background: u.id === current ? 'var(--muted)' : 'transparent',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        transition: 'background 0.2s',
+                        border: u.id === current ? '1px solid var(--primary)' : '1px solid transparent'
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'var(--muted)'}
+                    onMouseLeave={e => e.currentTarget.style.background = u.id === current ? 'var(--muted)' : 'transparent'}
+                >
+                    <div style={{ fontSize: '1.5rem' }}>{getMarketIcon(u.market)}</div>
+                    <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: '600', fontSize: '0.9rem' }}>{u.name}</div>
+                        <div style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)' }}>
+                            <span style={{ color: 'var(--primary)', fontWeight: 'bold' }}>{u.count}</span> companies
+                        </div>
+                    </div>
+                    {u.id === current && <div style={{ marginLeft: 'auto', color: 'var(--primary)' }}>✓</div>}
+                </div>
+            ))}
+            
+            {customUniverses.length > 0 && (
+                <>
+                    <div style={{ padding: '8px 12px', fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--muted-foreground)', textTransform: 'uppercase', marginTop: '8px' }}>Custom Universes</div>
+                    {customUniverses.map(u => (
+                        <div 
+                            key={u.id}
+                            onClick={() => { onChange(u.id); setIsOpen(false); }}
+                            style={{
+                                padding: '10px',
+                                borderRadius: 'var(--radius)',
+                                cursor: 'pointer',
+                                background: u.id === current ? 'var(--muted)' : 'transparent',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '10px',
+                                transition: 'background 0.2s',
+                                border: u.id === current ? '1px solid var(--primary)' : '1px solid transparent'
+                            }}
+                            onMouseEnter={e => e.currentTarget.style.background = 'var(--muted)'}
+                            onMouseLeave={e => e.currentTarget.style.background = u.id === current ? 'var(--muted)' : 'transparent'}
+                        >
+                            <div style={{ fontSize: '1.5rem' }}>{getMarketIcon(u.market)}</div>
+                            <div style={{ flex: 1 }}>
+                                <div style={{ fontWeight: '600', fontSize: '0.9rem' }}>{u.name}</div>
+                                <div style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)' }}>
+                                    <span style={{ color: 'var(--primary)', fontWeight: 'bold' }}>{u.count}</span> companies
+                                </div>
+                            </div>
+                            {u.id === current && <div style={{ marginLeft: 'auto', color: 'var(--primary)' }}>✓</div>}
+                        </div>
+                    ))}
+                </>
+            )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 export default function Home() {
   const [tab, setTab] = useState<'models'|'advanced'|'backtest'|'universe'|'model-detail'|'history'|'status'|'settings'>('models');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -1155,16 +1305,13 @@ export default function Home() {
         {/* Universe Selector at bottom */}
         <div style={{ padding: sidebarCollapsed ? '0.5rem' : '0.75rem', borderTop: '1px solid var(--border)' }}>
           {!sidebarCollapsed && <label style={{ fontSize: '0.7rem', color: 'var(--muted-foreground)', display: 'block', marginBottom: '4px' }}>Universe</label>}
-          {sidebarCollapsed ? (
-            <div style={{ textAlign: 'center' }} title={`Universe: ${universe}`}>
-              <span style={{ fontSize: '1.2rem' }}>🌐</span>
-            </div>
-          ) : (
-            <select style={{ ...S.select, width: '100%', marginRight: 0, fontSize: '0.8rem' }} value={universe} onChange={e => setUniverse(e.target.value)}>
-              <optgroup label="Built-in">{universes.map(u => <option key={u.id} value={u.id}>{u.name} ({u.count})</option>)}</optgroup>
-              {customUniverses.length > 0 && <optgroup label="Custom">{customUniverses.map(u => <option key={u.id} value={u.id}>{u.name} ({u.count})</option>)}</optgroup>}
-            </select>
-          )}
+          <UniverseSelector 
+            current={universe} 
+            universes={universes} 
+            customUniverses={customUniverses} 
+            onChange={setUniverse} 
+            sidebarCollapsed={sidebarCollapsed}
+          />
         </div>
       </div>
 
