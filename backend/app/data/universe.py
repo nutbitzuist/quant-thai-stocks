@@ -140,6 +140,129 @@ SP500_STOCKS: List[Stock] = [
     Stock("SHW", "Sherwin-Williams", Sector.MATERIALS, Market.US, False),
 ]
 
+# ============================================================
+# DJI - Dow Jones Industrial Average (30 Stocks)
+# ============================================================
+DJI_STOCKS: List[Stock] = [
+    Stock("AAPL", "Apple", Sector.TECHNOLOGY, Market.US, True),
+    Stock("AMGN", "Amgen", Sector.HEALTHCARE, Market.US, True),
+    Stock("AXP", "American Express", Sector.FINANCIALS, Market.US, True),
+    Stock("BA", "Boeing", Sector.INDUSTRIALS, Market.US, True),
+    Stock("CAT", "Caterpillar", Sector.INDUSTRIALS, Market.US, True),
+    Stock("CRM", "Salesforce", Sector.TECHNOLOGY, Market.US, True),
+    Stock("CSCO", "Cisco", Sector.TECHNOLOGY, Market.US, True),
+    Stock("CVX", "Chevron", Sector.ENERGY, Market.US, True),
+    Stock("DIS", "Disney", Sector.COMMUNICATIONS, Market.US, True),
+    Stock("DOW", "Dow", Sector.MATERIALS, Market.US, True),
+    Stock("GS", "Goldman Sachs", Sector.FINANCIALS, Market.US, True),
+    Stock("HD", "Home Depot", Sector.CONSUMER, Market.US, True),
+    Stock("HON", "Honeywell", Sector.INDUSTRIALS, Market.US, True),
+    Stock("IBM", "IBM", Sector.TECHNOLOGY, Market.US, True),
+    Stock("INTC", "Intel", Sector.TECHNOLOGY, Market.US, True),
+    Stock("JNJ", "Johnson & Johnson", Sector.HEALTHCARE, Market.US, True),
+    Stock("JPM", "JPMorgan Chase", Sector.FINANCIALS, Market.US, True),
+    Stock("KO", "Coca-Cola", Sector.CONSUMER, Market.US, True),
+    Stock("MCD", "McDonald's", Sector.CONSUMER, Market.US, True),
+    Stock("MMM", "3M", Sector.INDUSTRIALS, Market.US, True),
+    Stock("MRK", "Merck", Sector.HEALTHCARE, Market.US, True),
+    Stock("MSFT", "Microsoft", Sector.TECHNOLOGY, Market.US, True),
+    Stock("NKE", "Nike", Sector.CONSUMER, Market.US, True),
+    Stock("PG", "Procter & Gamble", Sector.CONSUMER, Market.US, True),
+    Stock("TRV", "Travelers", Sector.FINANCIALS, Market.US, True),
+    Stock("UNH", "UnitedHealth", Sector.HEALTHCARE, Market.US, True),
+    Stock("V", "Visa", Sector.FINANCIALS, Market.US, True),
+    Stock("VZ", "Verizon", Sector.COMMUNICATIONS, Market.US, True),
+    Stock("WBA", "Walgreens Boots Alliance", Sector.CONSUMER, Market.US, True),
+    Stock("WMT", "Walmart", Sector.CONSUMER, Market.US, True),
+]
+
+# ============================================================
+# NASDAQ 100 - Top Technology & Growth (Major Constituents)
+# ============================================================
+NASDAQ100_STOCKS: List[Stock] = [
+    Stock("AAPL", "Apple", Sector.TECHNOLOGY, Market.US, True),
+    Stock("MSFT", "Microsoft", Sector.TECHNOLOGY, Market.US, True),
+    Stock("GOOG", "Alphabet (C)", Sector.TECHNOLOGY, Market.US, True),
+    Stock("GOOGL", "Alphabet (A)", Sector.TECHNOLOGY, Market.US, True),
+    Stock("AMZN", "Amazon", Sector.CONSUMER, Market.US, True),
+    Stock("NVDA", "NVIDIA", Sector.TECHNOLOGY, Market.US, True),
+    Stock("META", "Meta Platforms", Sector.TECHNOLOGY, Market.US, True),
+    Stock("TSLA", "Tesla", Sector.CONSUMER, Market.US, True),
+    Stock("AVGO", "Broadcom", Sector.TECHNOLOGY, Market.US, True),
+    Stock("ASML", "ASML", Sector.TECHNOLOGY, Market.US, True),
+    Stock("COST", "Costco", Sector.CONSUMER, Market.US, True),
+    Stock("PEP", "PepsiCo", Sector.CONSUMER, Market.US, True),
+    Stock("ADBE", "Adobe", Sector.TECHNOLOGY, Market.US, True),
+    Stock("CSCO", "Cisco", Sector.TECHNOLOGY, Market.US, True),
+    Stock("NFLX", "Netflix", Sector.COMMUNICATIONS, Market.US, True),
+    Stock("AMD", "AMD", Sector.TECHNOLOGY, Market.US, True),
+    Stock("INTC", "Intel", Sector.TECHNOLOGY, Market.US, True),
+    Stock("TMUS", "T-Mobile US", Sector.COMMUNICATIONS, Market.US, True),
+    Stock("CMCSA", "Comcast", Sector.COMMUNICATIONS, Market.US, True),
+    Stock("INTU", "Intuit", Sector.TECHNOLOGY, Market.US, True),
+    Stock("QCOM", "Qualcomm", Sector.TECHNOLOGY, Market.US, True),
+    Stock("AMGN", "Amgen", Sector.HEALTHCARE, Market.US, True),
+    Stock("TXN", "Texas Instruments", Sector.TECHNOLOGY, Market.US, True),
+    Stock("HON", "Honeywell", Sector.INDUSTRIALS, Market.US, True),
+    Stock("BKNG", "Booking Holdings", Sector.CONSUMER, Market.US, True),
+    Stock("AMAT", "Applied Materials", Sector.TECHNOLOGY, Market.US, True),
+    Stock("SBUX", "Starbucks", Sector.CONSUMER, Market.US, True),
+    Stock("GILD", "Gilead Sciences", Sector.HEALTHCARE, Market.US, True),
+    Stock("MDLZ", "Mondelez", Sector.CONSUMER, Market.US, True),
+    Stock("ADP", "ADP", Sector.INDUSTRIALS, Market.US, True),
+    Stock("ISRG", "Intuitive Surgical", Sector.HEALTHCARE, Market.US, True),
+    Stock("LRCX", "Lam Research", Sector.TECHNOLOGY, Market.US, True),
+    Stock("ADI", "Analog Devices", Sector.TECHNOLOGY, Market.US, True),
+    Stock("REGN", "Regeneron", Sector.HEALTHCARE, Market.US, True),
+    Stock("VRTX", "Vertex Pharmaceuticals", Sector.HEALTHCARE, Market.US, True),
+    Stock("PYPL", "PayPal", Sector.FINANCIALS, Market.US, True),
+    Stock("MU", "Micron", Sector.TECHNOLOGY, Market.US, True),
+    Stock("PANW", "Palo Alto Networks", Sector.TECHNOLOGY, Market.US, True),
+    Stock("CSX", "CSX", Sector.INDUSTRIALS, Market.US, True),
+    Stock("MELI", "MercadoLibre", Sector.CONSUMER, Market.US, True),
+    Stock("KLAC", "KLA Corp", Sector.TECHNOLOGY, Market.US, True),
+    Stock("SNPS", "Synopsys", Sector.TECHNOLOGY, Market.US, True),
+    Stock("CDNS", "Cadence Design", Sector.TECHNOLOGY, Market.US, True),
+    Stock("MAR", "Marriott", Sector.CONSUMER, Market.US, True),
+    Stock("ORLY", "O'Reilly Automotive", Sector.CONSUMER, Market.US, True),
+    Stock("FTNT", "Fortinet", Sector.TECHNOLOGY, Market.US, True),
+    Stock("CTAS", "Cintas", Sector.INDUSTRIALS, Market.US, True),
+    Stock("KDP", "Keurig Dr Pepper", Sector.CONSUMER, Market.US, True),
+    Stock("ABNB", "Airbnb", Sector.CONSUMER, Market.US, True),
+    Stock("WDAY", "Workday", Sector.TECHNOLOGY, Market.US, True),
+    Stock("NXPI", "NXP Semi", Sector.TECHNOLOGY, Market.US, True),
+    Stock("PCAR", "PACCAR", Sector.INDUSTRIALS, Market.US, True),
+    Stock("PAYX", "Paychex", Sector.INDUSTRIALS, Market.US, True),
+    Stock("AEP", "American Electric Power", Sector.UTILITIES, Market.US, True),
+    Stock("EXC", "Exelon", Sector.UTILITIES, Market.US, True),
+    Stock("ROST", "Ross Stores", Sector.CONSUMER, Market.US, True),
+    Stock("LULU", "Lululemon", Sector.CONSUMER, Market.US, True),
+    Stock("MRVL", "Marvell", Sector.TECHNOLOGY, Market.US, True),
+    Stock("IDXX", "IDEXX Labs", Sector.HEALTHCARE, Market.US, True),
+    Stock("MCHP", "Microchip", Sector.TECHNOLOGY, Market.US, True),
+    Stock("CRWD", "CrowdStrike", Sector.TECHNOLOGY, Market.US, True),
+    Stock("CTSH", "Cognizant", Sector.TECHNOLOGY, Market.US, True),
+    Stock("EA", "Electronic Arts", Sector.COMMUNICATIONS, Market.US, True),
+    Stock("BIIB", "Biogen", Sector.HEALTHCARE, Market.US, True),
+    Stock("FAST", "Fastenal", Sector.INDUSTRIALS, Market.US, True),
+    Stock("DXCM", "DexCom", Sector.HEALTHCARE, Market.US, True),
+    Stock("DLTR", "Dollar Tree", Sector.CONSUMER, Market.US, True),
+    Stock("XEL", "Xcel Energy", Sector.UTILITIES, Market.US, True),
+    Stock("MNST", "Monster Beverage", Sector.CONSUMER, Market.US, True),
+    Stock("ILMN", "Illumina", Sector.HEALTHCARE, Market.US, True),
+    Stock("ODFL", "Old Dominion", Sector.INDUSTRIALS, Market.US, True),
+    Stock("WBA", "Walgreens", Sector.CONSUMER, Market.US, True),
+    Stock("EBAY", "eBay", Sector.CONSUMER, Market.US, True),
+    Stock("SIRI", "Sirius XM", Sector.COMMUNICATIONS, Market.US, True),
+    Stock("ZM", "Zoom Video", Sector.TECHNOLOGY, Market.US, True),
+    Stock("DDOG", "Datadog", Sector.TECHNOLOGY, Market.US, True),
+    Stock("ANSS", "ANSYS", Sector.TECHNOLOGY, Market.US, True),
+    Stock("TTD", "The Trade Desk", Sector.TECHNOLOGY, Market.US, True),
+    Stock("ALGN", "Align Tech", Sector.HEALTHCARE, Market.US, True),
+    Stock("CEG", "Constellation Energy", Sector.UTILITIES, Market.US, True),
+    Stock("GEHC", "GE HealthCare", Sector.HEALTHCARE, Market.US, True),
+]
+
 
 # ============================================================
 # SET100 - Thailand (Official list)
@@ -532,6 +655,8 @@ def get_universe(name: str) -> List[Stock]:
         "set100": SET100_STOCKS,
         "set50": [s for s in SET100_STOCKS if s.is_major],
         "set": SET_STOCKS,
+        "dji": DJI_STOCKS,
+        "nasdaq100": NASDAQ100_STOCKS,
     }
     return universes.get(name.lower(), SP500_STOCKS)
 
@@ -543,7 +668,7 @@ def get_tickers(universe: str) -> List[str]:
 
 def get_stock_info(ticker: str) -> Optional[Stock]:
     """Get stock info by ticker"""
-    all_stocks = SP500_STOCKS + SET100_STOCKS + SET_STOCKS
+    all_stocks = SP500_STOCKS + SET100_STOCKS + SET_STOCKS + DJI_STOCKS + NASDAQ100_STOCKS
     for stock in all_stocks:
         if stock.ticker == ticker:
             return stock
@@ -572,6 +697,8 @@ def get_available_universes() -> List[Dict]:
     return [
         {"id": "sp500", "name": "S&P 500 (Top 80)", "market": "US", "count": len(SP500_STOCKS)},
         {"id": "sp50", "name": "S&P 50 (Mega Cap)", "market": "US", "count": len([s for s in SP500_STOCKS if s.is_major])},
+        {"id": "dji", "name": "Dow Jones Industrial Average", "market": "US", "count": len(DJI_STOCKS)},
+        {"id": "nasdaq100", "name": "NASDAQ 100", "market": "US", "count": len(NASDAQ100_STOCKS)},
         {"id": "set100", "name": "SET100 (Thailand)", "market": "Thailand", "count": len(SET100_STOCKS)},
         {"id": "set50", "name": "SET50 (Thailand Large Cap)", "market": "Thailand", "count": len([s for s in SET100_STOCKS if s.is_major])},
         {"id": "set", "name": "SET Index (Complete)", "market": "Thailand", "count": len(SET_STOCKS)},
