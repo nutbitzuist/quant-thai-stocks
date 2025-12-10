@@ -585,6 +585,22 @@ export default function Home() {
   const [optimizationLoading, setOptimizationLoading] = useState(false);
   const [backtestCapabilities, setBacktestCapabilities] = useState<any>(null);
 
+  // Model Comparison state
+  const [compareModels, setCompareModels] = useState<string[]>([]);
+  const [comparisonResults, setComparisonResults] = useState<BacktestResult[]>([]);
+  const [comparisonRunning, setComparisonRunning] = useState(false);
+
+  // Saved Configurations state
+  const [savedConfigs, setSavedConfigs] = useState<Array<{ name: string; config: any }>>([]);
+  const [configName, setConfigName] = useState('');
+
+  // Trailing Stop state
+  const [trailingStop, setTrailingStop] = useState<number | null>(null);
+
+  // Optimization Parameters state
+  const [optimizationMetric, setOptimizationMetric] = useState('sharpe_ratio');
+  const [optimizationParamGrid, setOptimizationParamGrid] = useState('{}');
+
   // Advanced features state
   const [signalCombinerUniverse, setSignalCombinerUniverse] = useState('sp50');
   const [signalCombinerMinConf, setSignalCombinerMinConf] = useState(3);
@@ -809,6 +825,140 @@ export default function Home() {
     setWalkForwardLoading(false);
   };
 
+  // Run Model Comparison - backtest multiple models
+  const runModelComparison = async () => {
+    if (compareModels.length < 2) { log('error', 'Select at least 2 models to compare'); return; }
+    setComparisonRunning(true);
+    setComparisonResults([]);
+    log('info', `Comparing ${compareModels.length} models...`);
+
+    const results: BacktestResult[] = [];
+    for (const modelId of compareModels) {
+      try {
+        const r = await fetch(`${API_URL}/api/backtest/run`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model_id: modelId,
+            universe: backtestUniverse,
+            initial_capital: backtestCapital,
+            max_positions: backtestMaxPositions,
+            position_size: backtestPositionSize,
+            stop_loss: stopLoss,
+            take_profit: takeProfit,
+            rebalance_freq: rebalanceFreq
+          })
+        });
+        if (r.ok) {
+          const d = await r.json();
+          results.push({ ...d, model_name: modelId });
+        }
+      } catch (e) {
+        log('error', `Failed to backtest ${modelId}`);
+      }
+    }
+    setComparisonResults(results);
+    log('success', `Compared ${results.length} models`);
+    setComparisonRunning(false);
+  };
+
+  // Run Parameter Optimization
+  const runOptimization = async () => {
+    if (!backtestModel) { log('error', 'Please select a model first'); return; }
+
+    let paramGrid: Record<string, any[]>;
+    try {
+      paramGrid = JSON.parse(optimizationParamGrid);
+      if (Object.keys(paramGrid).length === 0) {
+        log('error', 'Please enter parameter grid (e.g., {"threshold": [0.5, 0.6, 0.7]})');
+        return;
+      }
+    } catch {
+      log('error', 'Invalid JSON for parameter grid');
+      return;
+    }
+
+    setOptimizationLoading(true);
+    log('info', `Running parameter optimization for ${backtestModel}...`);
+    try {
+      const r = await fetch(`${API_URL}/api/backtest/optimize`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model_id: backtestModel,
+          universe: backtestUniverse,
+          param_grid: paramGrid,
+          metric: optimizationMetric
+        })
+      });
+      if (r.ok) {
+        const d = await r.json();
+        setOptimizationResults(d);
+        log('success', `Optimization complete: Best Sharpe ${d.best_sharpe?.toFixed(2)}, Best Return ${d.best_return?.toFixed(2)}%`);
+      } else {
+        const e = await r.json();
+        log('error', `Optimization failed: ${e.detail || r.statusText}`);
+      }
+    } catch (e: any) {
+      log('error', `Optimization error: ${e.message || e}`);
+    }
+    setOptimizationLoading(false);
+  };
+
+  // Save current configuration
+  const saveConfig = () => {
+    if (!configName.trim()) { log('error', 'Please enter a config name'); return; }
+    const config = {
+      model: backtestModel,
+      universe: backtestUniverse,
+      capital: backtestCapital,
+      maxPositions: backtestMaxPositions,
+      positionSize: backtestPositionSize,
+      stopLoss,
+      takeProfit,
+      trailingStop,
+      rebalanceFreq,
+      useVectorBT
+    };
+    const newConfigs = [...savedConfigs, { name: configName, config }];
+    setSavedConfigs(newConfigs);
+    localStorage.setItem('backtestConfigs', JSON.stringify(newConfigs));
+    setConfigName('');
+    log('success', `Configuration "${configName}" saved`);
+  };
+
+  // Load a saved configuration
+  const loadConfig = (config: any) => {
+    if (config.model) setBacktestModel(config.model);
+    if (config.universe) setBacktestUniverse(config.universe);
+    if (config.capital) setBacktestCapital(config.capital);
+    if (config.maxPositions) setBacktestMaxPositions(config.maxPositions);
+    if (config.positionSize) setBacktestPositionSize(config.positionSize);
+    setStopLoss(config.stopLoss ?? null);
+    setTakeProfit(config.takeProfit ?? null);
+    setTrailingStop(config.trailingStop ?? null);
+    if (config.rebalanceFreq) setRebalanceFreq(config.rebalanceFreq);
+    if (config.useVectorBT !== undefined) setUseVectorBT(config.useVectorBT);
+    log('success', 'Configuration loaded');
+  };
+
+  // Delete a saved configuration
+  const deleteConfig = (name: string) => {
+    const newConfigs = savedConfigs.filter(c => c.name !== name);
+    setSavedConfigs(newConfigs);
+    localStorage.setItem('backtestConfigs', JSON.stringify(newConfigs));
+    log('info', `Configuration "${name}" deleted`);
+  };
+
+  // Load saved configs from localStorage on mount
+  useEffect(() => {
+    const stored = localStorage.getItem('backtestConfigs');
+    if (stored) {
+      try {
+        setSavedConfigs(JSON.parse(stored));
+      } catch { /* ignore */ }
+    }
+  }, []);
 
   const downloadBacktestPDF = async (result: BacktestResult) => {
     try {
@@ -2039,6 +2189,16 @@ export default function Home() {
                         <label style={{ display: 'block', marginBottom: '5px', fontSize: '12px', fontWeight: 'bold' }}>Max Positions</label>
                         <input type="number" style={{ ...S.input, fontSize: '12px' }} value={backtestMaxPositions} onChange={e => setBacktestMaxPositions(Number(e.target.value))} min={1} max={50} />
                       </div>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '5px', fontSize: '12px', fontWeight: 'bold' }}>Trailing Stop %</label>
+                        <select style={{ ...S.select, width: '100%', fontSize: '12px' }} value={trailingStop ?? ''} onChange={e => setTrailingStop(e.target.value ? Number(e.target.value) : null)}>
+                          <option value="">None</option>
+                          <option value="0.05">5%</option>
+                          <option value="0.10">10%</option>
+                          <option value="0.15">15%</option>
+                          <option value="0.20">20%</option>
+                        </select>
+                      </div>
                     </div>
                   )}
 
@@ -2106,6 +2266,188 @@ export default function Home() {
                   )}
                 </div>
               </div>
+
+              {/* Save/Load Configurations */}
+              <div style={{ ...S.card, borderLeft: '4px solid #f59e0b' }}>
+                <h3 style={{ marginTop: 0, marginBottom: '15px' }}>💾 Configuration Management</h3>
+                <div style={{ display: 'flex', gap: '10px', marginBottom: '15px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                  <div style={{ flex: 1, minWidth: '200px' }}>
+                    <label style={{ display: 'block', marginBottom: '5px', fontSize: '12px' }}>Config Name</label>
+                    <input
+                      type="text"
+                      style={{ ...S.input, fontSize: '12px' }}
+                      value={configName}
+                      onChange={e => setConfigName(e.target.value)}
+                      placeholder="My Strategy Config"
+                    />
+                  </div>
+                  <button style={{ ...S.btn('primary'), fontSize: '12px' }} onClick={saveConfig}>
+                    💾 Save Current
+                  </button>
+                </div>
+                {savedConfigs.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                    {savedConfigs.map((c, i) => (
+                      <div key={i} style={{ background: 'var(--muted)', padding: '8px 12px', borderRadius: 'var(--radius)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '12px', fontWeight: 'bold' }}>{c.name}</span>
+                        <button style={{ ...S.btn('success'), padding: '2px 6px', fontSize: '10px' }} onClick={() => loadConfig(c.config)}>Load</button>
+                        <button style={{ ...S.btn('secondary'), padding: '2px 6px', fontSize: '10px' }} onClick={() => deleteConfig(c.name)}>✕</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {savedConfigs.length === 0 && (
+                  <p style={{ margin: 0, fontSize: '12px', color: 'var(--muted-foreground)' }}>No saved configurations yet. Save your backtest settings for quick reuse.</p>
+                )}
+              </div>
+
+              {/* Model Comparison */}
+              <div style={{ ...S.card, borderLeft: '4px solid #06b6d4' }}>
+                <h3 style={{ marginTop: 0, marginBottom: '15px' }}>📊 Compare Models</h3>
+                <p style={{ fontSize: '12px', color: 'var(--muted-foreground)', marginBottom: '15px' }}>Select multiple models to compare their backtest performance side-by-side.</p>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '15px' }}>
+                  {models.map(m => (
+                    <label key={m.id} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', padding: '4px 8px', background: compareModels.includes(m.id) ? '#06b6d4' : 'var(--muted)', borderRadius: '4px', cursor: 'pointer', color: compareModels.includes(m.id) ? 'white' : 'inherit' }}>
+                      <input
+                        type="checkbox"
+                        checked={compareModels.includes(m.id)}
+                        onChange={e => {
+                          if (e.target.checked) {
+                            setCompareModels([...compareModels, m.id]);
+                          } else {
+                            setCompareModels(compareModels.filter(id => id !== m.id));
+                          }
+                        }}
+                        style={{ display: 'none' }}
+                      />
+                      {m.name}
+                    </label>
+                  ))}
+                </div>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                  <button
+                    style={{ ...S.btn('primary'), fontSize: '12px' }}
+                    onClick={runModelComparison}
+                    disabled={compareModels.length < 2 || comparisonRunning}
+                  >
+                    {comparisonRunning ? '⏳ Comparing...' : `🔍 Compare ${compareModels.length} Models`}
+                  </button>
+                  {compareModels.length > 0 && (
+                    <button style={{ ...S.btn('secondary'), fontSize: '12px' }} onClick={() => setCompareModels([])}>Clear Selection</button>
+                  )}
+                </div>
+
+                {/* Comparison Results Table */}
+                {comparisonResults.length > 0 && (
+                  <div style={{ marginTop: '20px', overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                      <thead>
+                        <tr style={{ background: 'var(--muted)' }}>
+                          <th style={{ padding: '10px', textAlign: 'left' }}>Model</th>
+                          <th style={{ padding: '10px', textAlign: 'right' }}>Total Return</th>
+                          <th style={{ padding: '10px', textAlign: 'right' }}>Annual Return</th>
+                          <th style={{ padding: '10px', textAlign: 'right' }}>Sharpe</th>
+                          <th style={{ padding: '10px', textAlign: 'right' }}>Max Drawdown</th>
+                          <th style={{ padding: '10px', textAlign: 'right' }}>Sortino</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {comparisonResults.map((r, i) => (
+                          <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
+                            <td style={{ padding: '10px', fontWeight: 'bold' }}>{r.model_name || r.strategy_name}</td>
+                            <td style={{ padding: '10px', textAlign: 'right', color: (r.total_return ?? 0) >= 0 ? '#22c55e' : 'var(--destructive)' }}>{(r.total_return ?? 0).toFixed(2)}%</td>
+                            <td style={{ padding: '10px', textAlign: 'right', color: (r.annual_return ?? 0) >= 0 ? '#22c55e' : 'var(--destructive)' }}>{(r.annual_return ?? 0).toFixed(2)}%</td>
+                            <td style={{ padding: '10px', textAlign: 'right' }}>{(r.sharpe_ratio ?? 0).toFixed(2)}</td>
+                            <td style={{ padding: '10px', textAlign: 'right', color: 'var(--destructive)' }}>{(r.max_drawdown ?? 0).toFixed(2)}%</td>
+                            <td style={{ padding: '10px', textAlign: 'right' }}>{(r.sortino_ratio ?? 0).toFixed(2)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    <button style={{ ...S.btn('secondary'), marginTop: '10px', fontSize: '11px' }} onClick={() => setComparisonResults([])}>Clear Results</button>
+                  </div>
+                )}
+              </div>
+
+              {/* Parameter Optimization */}
+              {useVectorBT && (
+                <div style={{ ...S.card, borderLeft: '4px solid #a855f7' }}>
+                  <h3 style={{ marginTop: 0, marginBottom: '15px' }}>🔧 Parameter Optimization</h3>
+                  <p style={{ fontSize: '12px', color: 'var(--muted-foreground)', marginBottom: '15px' }}>Find optimal model parameters using grid search.</p>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '15px' }}>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '5px', fontSize: '12px', fontWeight: 'bold' }}>Optimization Metric</label>
+                      <select style={{ ...S.select, width: '100%', fontSize: '12px' }} value={optimizationMetric} onChange={e => setOptimizationMetric(e.target.value)}>
+                        <option value="sharpe_ratio">Sharpe Ratio</option>
+                        <option value="total_return">Total Return</option>
+                        <option value="calmar_ratio">Calmar Ratio</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '5px', fontSize: '12px', fontWeight: 'bold' }}>Parameter Grid (JSON)</label>
+                      <input
+                        type="text"
+                        style={{ ...S.input, fontSize: '12px' }}
+                        value={optimizationParamGrid}
+                        onChange={e => setOptimizationParamGrid(e.target.value)}
+                        placeholder='{"threshold": [0.5, 0.6, 0.7]}'
+                      />
+                    </div>
+                  </div>
+                  <button
+                    style={{ ...S.btn('primary'), fontSize: '12px' }}
+                    onClick={runOptimization}
+                    disabled={!backtestModel || optimizationLoading}
+                  >
+                    {optimizationLoading ? '⏳ Optimizing...' : '🔧 Run Optimization'}
+                  </button>
+
+                  {/* Optimization Results */}
+                  {optimizationResults && (
+                    <div style={{ marginTop: '20px', background: 'var(--muted)', padding: '15px', borderRadius: 'var(--radius)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                        <h4 style={{ margin: 0 }}>Optimization Results</h4>
+                        <button style={{ ...S.btn('secondary'), fontSize: '10px', padding: '2px 6px' }} onClick={() => setOptimizationResults(null)}>Clear</button>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginBottom: '15px' }}>
+                        <div>
+                          <div style={{ fontSize: '10px', color: 'var(--muted-foreground)' }}>Best Sharpe</div>
+                          <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#22c55e' }}>{optimizationResults.best_sharpe?.toFixed(2)}</div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '10px', color: 'var(--muted-foreground)' }}>Best Return</div>
+                          <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#22c55e' }}>{optimizationResults.best_return?.toFixed(2)}%</div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '10px', color: 'var(--muted-foreground)' }}>Best Params</div>
+                          <div style={{ fontSize: '12px', fontWeight: 'bold' }}>{JSON.stringify(optimizationResults.best_params)}</div>
+                        </div>
+                      </div>
+                      {optimizationResults.all_results && (
+                        <details>
+                          <summary style={{ cursor: 'pointer', fontSize: '12px', color: 'var(--muted-foreground)' }}>View All Results ({optimizationResults.all_results.length})</summary>
+                          <div style={{ maxHeight: '200px', overflowY: 'auto', marginTop: '10px' }}>
+                            <table style={{ width: '100%', fontSize: '11px' }}>
+                              <thead>
+                                <tr><th>Params</th><th>Sharpe</th><th>Return</th></tr>
+                              </thead>
+                              <tbody>
+                                {optimizationResults.all_results.slice(0, 20).map((r: any, i: number) => (
+                                  <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
+                                    <td style={{ padding: '4px' }}>{JSON.stringify(r.params)}</td>
+                                    <td style={{ padding: '4px', textAlign: 'right' }}>{r.sharpe_ratio?.toFixed(2)}</td>
+                                    <td style={{ padding: '4px', textAlign: 'right' }}>{r.total_return?.toFixed(2)}%</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </details>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Monte Carlo Results */}
               {monteCarloResults && (
