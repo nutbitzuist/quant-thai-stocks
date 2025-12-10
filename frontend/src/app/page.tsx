@@ -1154,6 +1154,37 @@ export default function Home() {
     }
   };
 
+  // Generate QuantStats Tearsheet
+  const generateTearsheet = async () => {
+    if (!backtestModel) { log('error', 'Please select a model first'); return; }
+    setTearsheetLoading(true);
+    log('info', `Generating QuantStats performance report for ${backtestModel}...`);
+    try {
+      const r = await fetch(`${API_URL}/api/backtest/tearsheet`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model_id: backtestModel,
+          universe: backtestUniverse,
+          initial_capital: backtestCapital,
+          max_positions: backtestMaxPositions,
+          position_size: backtestPositionSize
+        })
+      });
+      if (r.ok) {
+        const data = await r.json();
+        setTearsheetData(data);
+        log('success', `Performance report generated: Sharpe ${data.metrics?.sharpe || 'N/A'}, CAGR ${data.metrics?.cagr || 'N/A'}%`);
+      } else {
+        const e = await r.json();
+        log('error', `Performance report failed: ${e.detail || r.statusText}`);
+      }
+    } catch (e: any) {
+      log('error', `Performance report error: ${e.message || e}`);
+    }
+    setTearsheetLoading(false);
+  };
+
   const downloadPDF = async (id: string) => {
     try {
       log('info', `Downloading PDF for run: ${id}`);
@@ -2014,6 +2045,174 @@ export default function Home() {
                   )}
                 </div>
               )}
+
+              {/* Performance Reports Section (QuantStats) */}
+              <div style={S.card}>
+                <h2 style={{ marginTop: 0 }}>📈 Performance Reports (QuantStats)</h2>
+                <p style={{ color: 'var(--muted-foreground)', marginBottom: '20px' }}>
+                  Generate comprehensive performance tearsheets using QuantStats. Includes advanced metrics, risk analysis, and return distributions.
+                </p>
+
+                <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+                  <button
+                    style={{ ...S.btn('primary'), fontSize: '14px', padding: '10px 20px' }}
+                    onClick={generateTearsheet}
+                    disabled={!backtestModel || tearsheetLoading}
+                  >
+                    {tearsheetLoading ? '⏳ Generating Report...' : '📊 Generate Performance Report'}
+                  </button>
+                  {tearsheetData && (
+                    <button
+                      style={{ ...S.btn('secondary'), fontSize: '14px', padding: '10px 20px' }}
+                      onClick={() => setTearsheetData(null)}
+                    >
+                      ✕ Clear Report
+                    </button>
+                  )}
+                </div>
+
+                {!backtestModel && (
+                  <div style={{ padding: '15px', background: 'var(--muted)', borderRadius: 'var(--radius)', color: 'var(--muted-foreground)' }}>
+                    ℹ️ Select a model above to generate performance reports
+                  </div>
+                )}
+
+                {tearsheetData && tearsheetData.metrics && (
+                  <div style={{ marginTop: '20px' }}>
+                    {/* Key Performance Metrics */}
+                    <h3 style={{ marginBottom: '15px' }}>📊 Key Metrics</h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '15px', marginBottom: '30px' }}>
+                      <div style={{ background: 'var(--muted)', padding: '15px', borderRadius: 'var(--radius)' }}>
+                        <div style={{ fontSize: '11px', color: 'var(--muted-foreground)', marginBottom: '5px' }}>Total Return</div>
+                        <div style={{ fontSize: '20px', fontWeight: 'bold', color: tearsheetData.metrics.total_return >= 0 ? '#22c55e' : 'var(--destructive)' }}>
+                          {tearsheetData.metrics.total_return >= 0 ? '+' : ''}{tearsheetData.metrics.total_return?.toFixed(2)}%
+                        </div>
+                      </div>
+                      <div style={{ background: 'var(--muted)', padding: '15px', borderRadius: 'var(--radius)' }}>
+                        <div style={{ fontSize: '11px', color: 'var(--muted-foreground)', marginBottom: '5px' }}>CAGR</div>
+                        <div style={{ fontSize: '20px', fontWeight: 'bold', color: tearsheetData.metrics.cagr >= 0 ? '#22c55e' : 'var(--destructive)' }}>
+                          {tearsheetData.metrics.cagr >= 0 ? '+' : ''}{tearsheetData.metrics.cagr?.toFixed(2)}%
+                        </div>
+                      </div>
+                      <div style={{ background: 'var(--muted)', padding: '15px', borderRadius: 'var(--radius)' }}>
+                        <div style={{ fontSize: '11px', color: 'var(--muted-foreground)', marginBottom: '5px' }}>Sharpe Ratio</div>
+                        <div style={{ fontSize: '20px', fontWeight: 'bold', color: tearsheetData.metrics.sharpe >= 1 ? '#22c55e' : tearsheetData.metrics.sharpe >= 0.5 ? '#f59e0b' : 'var(--destructive)' }}>
+                          {tearsheetData.metrics.sharpe?.toFixed(2)}
+                        </div>
+                      </div>
+                      <div style={{ background: 'var(--muted)', padding: '15px', borderRadius: 'var(--radius)' }}>
+                        <div style={{ fontSize: '11px', color: 'var(--muted-foreground)', marginBottom: '5px' }}>Sortino Ratio</div>
+                        <div style={{ fontSize: '20px', fontWeight: 'bold', color: tearsheetData.metrics.sortino >= 1.5 ? '#22c55e' : tearsheetData.metrics.sortino >= 0.5 ? '#f59e0b' : 'var(--destructive)' }}>
+                          {tearsheetData.metrics.sortino?.toFixed(2)}
+                        </div>
+                      </div>
+                      <div style={{ background: 'var(--muted)', padding: '15px', borderRadius: 'var(--radius)' }}>
+                        <div style={{ fontSize: '11px', color: 'var(--muted-foreground)', marginBottom: '5px' }}>Max Drawdown</div>
+                        <div style={{ fontSize: '20px', fontWeight: 'bold', color: 'var(--destructive)' }}>
+                          {tearsheetData.metrics.max_drawdown?.toFixed(2)}%
+                        </div>
+                      </div>
+                      <div style={{ background: 'var(--muted)', padding: '15px', borderRadius: 'var(--radius)' }}>
+                        <div style={{ fontSize: '11px', color: 'var(--muted-foreground)', marginBottom: '5px' }}>Calmar Ratio</div>
+                        <div style={{ fontSize: '20px', fontWeight: 'bold', color: tearsheetData.metrics.calmar >= 1 ? '#22c55e' : tearsheetData.metrics.calmar >= 0.5 ? '#f59e0b' : 'var(--muted-foreground)' }}>
+                          {tearsheetData.metrics.calmar?.toFixed(2)}
+                        </div>
+                      </div>
+                      <div style={{ background: 'var(--muted)', padding: '15px', borderRadius: 'var(--radius)' }}>
+                        <div style={{ fontSize: '11px', color: 'var(--muted-foreground)', marginBottom: '5px' }}>Win Rate</div>
+                        <div style={{ fontSize: '20px', fontWeight: 'bold', color: tearsheetData.metrics.win_rate >= 55 ? '#22c55e' : tearsheetData.metrics.win_rate >= 45 ? '#f59e0b' : 'var(--destructive)' }}>
+                          {tearsheetData.metrics.win_rate?.toFixed(1)}%
+                        </div>
+                      </div>
+                      <div style={{ background: 'var(--muted)', padding: '15px', borderRadius: 'var(--radius)' }}>
+                        <div style={{ fontSize: '11px', color: 'var(--muted-foreground)', marginBottom: '5px' }}>Volatility</div>
+                        <div style={{ fontSize: '20px', fontWeight: 'bold' }}>
+                          {tearsheetData.metrics.volatility?.toFixed(2)}%
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Risk Metrics */}
+                    <h3 style={{ marginBottom: '15px' }}>⚠️ Risk Metrics</h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '15px', marginBottom: '30px' }}>
+                      <div style={{ background: 'var(--muted)', padding: '12px', borderRadius: 'var(--radius)' }}>
+                        <div style={{ fontSize: '11px', color: 'var(--muted-foreground)' }}>VaR (95%)</div>
+                        <div style={{ fontSize: '16px', fontWeight: 'bold' }}>{tearsheetData.metrics.var_95?.toFixed(2)}%</div>
+                      </div>
+                      <div style={{ background: 'var(--muted)', padding: '12px', borderRadius: 'var(--radius)' }}>
+                        <div style={{ fontSize: '11px', color: 'var(--muted-foreground)' }}>CVaR (95%)</div>
+                        <div style={{ fontSize: '16px', fontWeight: 'bold' }}>{tearsheetData.metrics.cvar_95?.toFixed(2)}%</div>
+                      </div>
+                      <div style={{ background: 'var(--muted)', padding: '12px', borderRadius: 'var(--radius)' }}>
+                        <div style={{ fontSize: '11px', color: 'var(--muted-foreground)' }}>Best Day</div>
+                        <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#22c55e' }}>+{tearsheetData.metrics.best_day?.toFixed(2)}%</div>
+                      </div>
+                      <div style={{ background: 'var(--muted)', padding: '12px', borderRadius: 'var(--radius)' }}>
+                        <div style={{ fontSize: '11px', color: 'var(--muted-foreground)' }}>Worst Day</div>
+                        <div style={{ fontSize: '16px', fontWeight: 'bold', color: 'var(--destructive)' }}>{tearsheetData.metrics.worst_day?.toFixed(2)}%</div>
+                      </div>
+                      <div style={{ background: 'var(--muted)', padding: '12px', borderRadius: 'var(--radius)' }}>
+                        <div style={{ fontSize: '11px', color: 'var(--muted-foreground)' }}>Profit Factor</div>
+                        <div style={{ fontSize: '16px', fontWeight: 'bold' }}>{tearsheetData.metrics.profit_factor?.toFixed(2)}</div>
+                      </div>
+                      <div style={{ background: 'var(--muted)', padding: '12px', borderRadius: 'var(--radius)' }}>
+                        <div style={{ fontSize: '11px', color: 'var(--muted-foreground)' }}>Payoff Ratio</div>
+                        <div style={{ fontSize: '16px', fontWeight: 'bold' }}>{tearsheetData.metrics.payoff_ratio?.toFixed(2)}</div>
+                      </div>
+                    </div>
+
+                    {/* Monthly Returns */}
+                    {tearsheetData.monthly_returns && tearsheetData.monthly_returns.length > 0 && (
+                      <>
+                        <h3 style={{ marginBottom: '15px' }}>📅 Monthly Returns</h3>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '30px' }}>
+                          {tearsheetData.monthly_returns.slice(-12).map((m: any, i: number) => (
+                            <div
+                              key={i}
+                              style={{
+                                padding: '8px 12px',
+                                borderRadius: 'var(--radius)',
+                                background: m.return >= 0 ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+                                border: `1px solid ${m.return >= 0 ? '#22c55e' : '#ef4444'}`,
+                                textAlign: 'center',
+                                minWidth: '70px'
+                              }}
+                            >
+                              <div style={{ fontSize: '10px', color: 'var(--muted-foreground)' }}>
+                                {new Date(m.month).toLocaleDateString('en-US', { month: 'short', year: '2-digit' })}
+                              </div>
+                              <div style={{ fontSize: '12px', fontWeight: 'bold', color: m.return >= 0 ? '#22c55e' : '#ef4444' }}>
+                                {m.return >= 0 ? '+' : ''}{m.return?.toFixed(1)}%
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    )}
+
+                    {/* Equity Curve Summary */}
+                    {tearsheetData.equity_curve && tearsheetData.equity_curve.length > 0 && (
+                      <>
+                        <h3 style={{ marginBottom: '15px' }}>📈 Equity Curve</h3>
+                        <div style={{ display: 'flex', gap: '20px', marginBottom: '20px' }}>
+                          <div>
+                            <span style={{ fontSize: '12px', color: 'var(--muted-foreground)' }}>Start: </span>
+                            <span style={{ fontWeight: 'bold' }}>${tearsheetData.equity_curve[0]?.value?.toLocaleString()}</span>
+                          </div>
+                          <div>
+                            <span style={{ fontSize: '12px', color: 'var(--muted-foreground)' }}>End: </span>
+                            <span style={{ fontWeight: 'bold' }}>${tearsheetData.equity_curve[tearsheetData.equity_curve.length - 1]?.value?.toLocaleString()}</span>
+                          </div>
+                          <div>
+                            <span style={{ fontSize: '12px', color: 'var(--muted-foreground)' }}>Period: </span>
+                            <span style={{ fontWeight: 'bold' }}>{tearsheetData.equity_curve[0]?.date} to {tearsheetData.equity_curve[tearsheetData.equity_curve.length - 1]?.date}</span>
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
             </>
           )}
 
