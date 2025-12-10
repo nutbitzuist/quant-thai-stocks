@@ -11,10 +11,16 @@ interface Model { id: string; name: string; description: string; category: strin
 interface ModelResult { run_id: string; model_name: string; category: string; buy_signals: Signal[]; sell_signals: Signal[]; total_stocks_analyzed: number; stocks_with_data: number; }
 interface Log { time: string; type: 'info' | 'error' | 'success'; message: string; }
 interface BacktestResult {
-  model_name: string;
-  universe: string;
-  period: string;
-  performance: {
+  // Common fields
+  model_name?: string;
+  strategy_name?: string;  // VectorBT uses this
+  universe?: string;
+  period?: string;
+  start_date?: string;    // VectorBT uses this
+  end_date?: string;      // VectorBT uses this
+
+  // Simple backtester format (nested)
+  performance?: {
     initial_capital: number;
     final_value: number;
     total_return_pct: number;
@@ -22,7 +28,7 @@ interface BacktestResult {
     max_drawdown_pct: number;
     sharpe_ratio: number;
   };
-  trades: {
+  trades?: {
     total: number;
     winning: number;
     losing: number;
@@ -31,8 +37,39 @@ interface BacktestResult {
     avg_loss_pct: number;
     profit_factor: number;
   };
-  equity_curve: Array<{ date: string; equity: number }>;
-  recent_trades: Array<{
+
+  // VectorBT format (flat)
+  initial_capital?: number;
+  final_value?: number;
+  total_return?: number;
+  annual_return?: number;
+  benchmark_return?: number;
+  alpha?: number;
+  volatility?: number;
+  sharpe_ratio?: number;
+  sortino_ratio?: number;
+  max_drawdown?: number;
+  max_drawdown_duration?: number;
+  calmar_ratio?: number;
+  total_trades?: number;
+  winning_trades?: number;
+  losing_trades?: number;
+  win_rate?: number;
+  avg_win?: number;
+  avg_loss?: number;
+  profit_factor?: number;
+  avg_trade_duration?: number;
+  best_day?: number;
+  worst_day?: number;
+  avg_daily_return?: number;
+
+  // Time series data (VectorBT)
+  equity_curve?: Array<{ date: string; value?: number; equity?: number }>;
+  drawdown_curve?: Array<{ date: string; drawdown: number }>;
+  monthly_returns?: Array<{ month: string; return: number }>;
+
+  // Trades
+  recent_trades?: Array<{
     entry_date: string;
     exit_date: string;
     ticker: string;
@@ -2152,134 +2189,304 @@ export default function Home() {
                 <div style={S.card}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '15px' }}>
                     <div>
-                      <h3 style={{ marginTop: 0 }}>📈 Backtest Results: {backtestResults.model_name}</h3>
-                      <p style={{ color: 'var(--muted-foreground)', fontSize: '12px', margin: 0 }}>Period: {backtestResults.period}</p>
+                      <h3 style={{ marginTop: 0 }}>📈 Backtest Results: {backtestResults.model_name || backtestResults.strategy_name || 'Strategy'}</h3>
+                      <p style={{ color: 'var(--muted-foreground)', fontSize: '12px', margin: 0 }}>
+                        Period: {backtestResults.period || `${backtestResults.start_date} to ${backtestResults.end_date}`}
+                        {useVectorBT && <span style={{ marginLeft: '10px', padding: '2px 6px', background: '#8b5cf6', color: 'white', borderRadius: '4px', fontSize: '10px' }}>VectorBT</span>}
+                      </p>
                     </div>
                     <div style={{ display: 'flex', gap: '10px' }}>
                       <button
-                        style={{ ...S.btn('primary'), fontSize: '12px', padding: '6px 12px' }}
-                        onClick={() => downloadBacktestPDF(backtestResults)}
+                        style={{ ...S.btn('secondary'), fontSize: '11px', padding: '4px 8px' }}
+                        onClick={() => setBacktestResults(null)}
                       >
-                        📄 PDF
-                      </button>
-                      <button
-                        style={{ ...S.btn('success'), fontSize: '12px', padding: '6px 12px' }}
-                        onClick={() => downloadBacktestCSV(backtestResults)}
-                      >
-                        📊 CSV
+                        Clear Results
                       </button>
                     </div>
                   </div>
 
-                  {/* Performance Metrics */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px', marginBottom: '30px' }}>
+                  {/* Performance Metrics - Handle both formats */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '15px', marginBottom: '20px' }}>
                     <div style={{ background: 'var(--muted)', padding: '15px', borderRadius: 'var(--radius)' }}>
                       <div style={{ fontSize: '11px', color: 'var(--muted-foreground)', marginBottom: '5px' }}>Total Return</div>
-                      <div style={{ fontSize: '24px', fontWeight: 'bold', color: backtestResults.performance.total_return_pct >= 0 ? '#22c55e' : 'var(--destructive)' }}>
-                        {backtestResults.performance.total_return_pct >= 0 ? '+' : ''}{backtestResults.performance.total_return_pct.toFixed(2)}%
+                      <div style={{ fontSize: '24px', fontWeight: 'bold', color: (backtestResults.total_return ?? backtestResults.performance?.total_return_pct ?? 0) >= 0 ? '#22c55e' : 'var(--destructive)' }}>
+                        {(backtestResults.total_return ?? backtestResults.performance?.total_return_pct ?? 0) >= 0 ? '+' : ''}
+                        {(backtestResults.total_return ?? backtestResults.performance?.total_return_pct ?? 0).toFixed(2)}%
                       </div>
                     </div>
 
                     <div style={{ background: 'var(--muted)', padding: '15px', borderRadius: 'var(--radius)' }}>
                       <div style={{ fontSize: '11px', color: 'var(--muted-foreground)', marginBottom: '5px' }}>Annualized Return</div>
-                      <div style={{ fontSize: '24px', fontWeight: 'bold', color: backtestResults.performance.annualized_return_pct >= 0 ? '#22c55e' : 'var(--destructive)' }}>
-                        {backtestResults.performance.annualized_return_pct >= 0 ? '+' : ''}{backtestResults.performance.annualized_return_pct.toFixed(2)}%
+                      <div style={{ fontSize: '24px', fontWeight: 'bold', color: (backtestResults.annual_return ?? backtestResults.performance?.annualized_return_pct ?? 0) >= 0 ? '#22c55e' : 'var(--destructive)' }}>
+                        {(backtestResults.annual_return ?? backtestResults.performance?.annualized_return_pct ?? 0) >= 0 ? '+' : ''}
+                        {(backtestResults.annual_return ?? backtestResults.performance?.annualized_return_pct ?? 0).toFixed(2)}%
                       </div>
                     </div>
 
                     <div style={{ background: 'var(--muted)', padding: '15px', borderRadius: 'var(--radius)' }}>
                       <div style={{ fontSize: '11px', color: 'var(--muted-foreground)', marginBottom: '5px' }}>Sharpe Ratio</div>
-                      <div style={{ fontSize: '24px', fontWeight: 'bold', color: backtestResults.performance.sharpe_ratio >= 1 ? '#22c55e' : backtestResults.performance.sharpe_ratio >= 0.5 ? '#f59e0b' : 'var(--destructive)' }}>
-                        {backtestResults.performance.sharpe_ratio.toFixed(2)}
+                      <div style={{ fontSize: '24px', fontWeight: 'bold', color: (backtestResults.sharpe_ratio ?? backtestResults.performance?.sharpe_ratio ?? 0) >= 1 ? '#22c55e' : (backtestResults.sharpe_ratio ?? backtestResults.performance?.sharpe_ratio ?? 0) >= 0.5 ? '#f59e0b' : 'var(--destructive)' }}>
+                        {(backtestResults.sharpe_ratio ?? backtestResults.performance?.sharpe_ratio ?? 0).toFixed(2)}
                       </div>
                     </div>
 
                     <div style={{ background: 'var(--muted)', padding: '15px', borderRadius: 'var(--radius)' }}>
                       <div style={{ fontSize: '11px', color: 'var(--muted-foreground)', marginBottom: '5px' }}>Max Drawdown</div>
                       <div style={{ fontSize: '24px', fontWeight: 'bold', color: 'var(--destructive)' }}>
-                        {backtestResults.performance.max_drawdown_pct.toFixed(2)}%
+                        {(backtestResults.max_drawdown ?? backtestResults.performance?.max_drawdown_pct ?? 0).toFixed(2)}%
                       </div>
                     </div>
 
                     <div style={{ background: 'var(--muted)', padding: '15px', borderRadius: 'var(--radius)' }}>
                       <div style={{ fontSize: '11px', color: 'var(--muted-foreground)', marginBottom: '5px' }}>Final Value</div>
                       <div style={{ fontSize: '24px', fontWeight: 'bold' }}>
-                        ${backtestResults.performance.final_value.toLocaleString()}
+                        ${(backtestResults.final_value ?? backtestResults.performance?.final_value ?? backtestCapital).toLocaleString(undefined, { maximumFractionDigits: 0 })}
                       </div>
                     </div>
+
+                    {backtestResults.volatility && (
+                      <div style={{ background: 'var(--muted)', padding: '15px', borderRadius: 'var(--radius)' }}>
+                        <div style={{ fontSize: '11px', color: 'var(--muted-foreground)', marginBottom: '5px' }}>Volatility</div>
+                        <div style={{ fontSize: '24px', fontWeight: 'bold' }}>
+                          {backtestResults.volatility.toFixed(2)}%
+                        </div>
+                      </div>
+                    )}
                   </div>
 
-                  {/* Trade Statistics */}
-                  <h4 style={{ marginTop: '30px', marginBottom: '15px' }}>Trade Statistics</h4>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '15px', marginBottom: '30px' }}>
-                    <div>
-                      <div style={{ fontSize: '12px', color: 'var(--muted-foreground)' }}>Total Trades</div>
-                      <div style={{ fontSize: '18px', fontWeight: 'bold' }}>{backtestResults.trades.total}</div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: '12px', color: 'var(--muted-foreground)' }}>Win Rate</div>
-                      <div style={{ fontSize: '18px', fontWeight: 'bold', color: backtestResults.trades.win_rate_pct >= 50 ? '#22c55e' : 'var(--destructive)' }}>
-                        {backtestResults.trades.win_rate_pct.toFixed(1)}%
+                  {/* Additional VectorBT Metrics */}
+                  {backtestResults.sortino_ratio !== undefined && (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '10px', marginBottom: '20px' }}>
+                      <div style={{ background: 'var(--accent)', padding: '10px', borderRadius: 'var(--radius)', textAlign: 'center' }}>
+                        <div style={{ fontSize: '10px', color: 'var(--muted-foreground)' }}>Sortino</div>
+                        <div style={{ fontSize: '16px', fontWeight: 'bold' }}>{backtestResults.sortino_ratio?.toFixed(2) ?? 'N/A'}</div>
+                      </div>
+                      <div style={{ background: 'var(--accent)', padding: '10px', borderRadius: 'var(--radius)', textAlign: 'center' }}>
+                        <div style={{ fontSize: '10px', color: 'var(--muted-foreground)' }}>Calmar</div>
+                        <div style={{ fontSize: '16px', fontWeight: 'bold' }}>{backtestResults.calmar_ratio?.toFixed(2) ?? 'N/A'}</div>
+                      </div>
+                      <div style={{ background: 'var(--accent)', padding: '10px', borderRadius: 'var(--radius)', textAlign: 'center' }}>
+                        <div style={{ fontSize: '10px', color: 'var(--muted-foreground)' }}>Best Day</div>
+                        <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#22c55e' }}>+{backtestResults.best_day?.toFixed(2) ?? 0}%</div>
+                      </div>
+                      <div style={{ background: 'var(--accent)', padding: '10px', borderRadius: 'var(--radius)', textAlign: 'center' }}>
+                        <div style={{ fontSize: '10px', color: 'var(--muted-foreground)' }}>Worst Day</div>
+                        <div style={{ fontSize: '16px', fontWeight: 'bold', color: 'var(--destructive)' }}>{backtestResults.worst_day?.toFixed(2) ?? 0}%</div>
+                      </div>
+                      <div style={{ background: 'var(--accent)', padding: '10px', borderRadius: 'var(--radius)', textAlign: 'center' }}>
+                        <div style={{ fontSize: '10px', color: 'var(--muted-foreground)' }}>DD Duration</div>
+                        <div style={{ fontSize: '16px', fontWeight: 'bold' }}>{backtestResults.max_drawdown_duration ?? 0}d</div>
                       </div>
                     </div>
-                    <div>
-                      <div style={{ fontSize: '12px', color: 'var(--muted-foreground)' }}>Winning Trades</div>
-                      <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#22c55e' }}>{backtestResults.trades.winning}</div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: '12px', color: 'var(--muted-foreground)' }}>Losing Trades</div>
-                      <div style={{ fontSize: '18px', fontWeight: 'bold', color: 'var(--destructive)' }}>{backtestResults.trades.losing}</div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: '12px', color: 'var(--muted-foreground)' }}>Avg Win</div>
-                      <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#22c55e' }}>
-                        +{backtestResults.trades.avg_win_pct.toFixed(2)}%
-                      </div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: '12px', color: 'var(--muted-foreground)' }}>Avg Loss</div>
-                      <div style={{ fontSize: '18px', fontWeight: 'bold', color: 'var(--destructive)' }}>
-                        {backtestResults.trades.avg_loss_pct.toFixed(2)}%
-                      </div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: '12px', color: 'var(--muted-foreground)' }}>Profit Factor</div>
-                      <div style={{ fontSize: '18px', fontWeight: 'bold', color: backtestResults.trades.profit_factor >= 1.5 ? '#22c55e' : backtestResults.trades.profit_factor >= 1 ? '#f59e0b' : 'var(--destructive)' }}>
-                        {backtestResults.trades.profit_factor.toFixed(2)}
-                      </div>
-                    </div>
-                  </div>
+                  )}
 
-                  {/* Recent Trades */}
+                  {/* Equity Curve Visualization */}
+                  {backtestResults.equity_curve && backtestResults.equity_curve.length > 0 && (
+                    <div style={{ marginBottom: '20px' }}>
+                      <h4 style={{ marginBottom: '10px' }}>📊 Equity Curve</h4>
+                      <div style={{ background: 'var(--muted)', padding: '15px', borderRadius: 'var(--radius)', height: '200px', position: 'relative' }}>
+                        <svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none" style={{ overflow: 'visible' }}>
+                          {(() => {
+                            const data = backtestResults.equity_curve;
+                            const values = data.map((d: any) => d.value);
+                            const min = Math.min(...values);
+                            const max = Math.max(...values);
+                            const range = max - min || 1;
+                            const startValue = values[0];
+
+                            const points = data.map((d: any, i: number) => {
+                              const x = (i / (data.length - 1)) * 100;
+                              const y = 100 - ((d.value - min) / range) * 90 - 5;
+                              return `${x},${y}`;
+                            }).join(' ');
+
+                            // Create area fill
+                            const areaPath = `M0,100 L0,${100 - ((values[0] - min) / range) * 90 - 5} ` +
+                              data.map((d: any, i: number) => {
+                                const x = (i / (data.length - 1)) * 100;
+                                const y = 100 - ((d.value - min) / range) * 90 - 5;
+                                return `L${x},${y}`;
+                              }).join(' ') + ` L100,100 Z`;
+
+                            return (
+                              <>
+                                {/* Initial value line */}
+                                <line x1="0" y1={100 - ((startValue - min) / range) * 90 - 5} x2="100" y2={100 - ((startValue - min) / range) * 90 - 5} stroke="#666" strokeWidth="0.2" strokeDasharray="1,1" />
+                                {/* Area fill */}
+                                <path d={areaPath} fill="url(#equityGradient)" opacity="0.3" />
+                                {/* Line */}
+                                <polyline points={points} fill="none" stroke="#22c55e" strokeWidth="0.5" />
+                                {/* Gradient definition */}
+                                <defs>
+                                  <linearGradient id="equityGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                                    <stop offset="0%" stopColor="#22c55e" stopOpacity="0.8" />
+                                    <stop offset="100%" stopColor="#22c55e" stopOpacity="0.1" />
+                                  </linearGradient>
+                                </defs>
+                              </>
+                            );
+                          })()}
+                        </svg>
+                        <div style={{ position: 'absolute', bottom: '5px', left: '10px', fontSize: '10px', color: 'var(--muted-foreground)' }}>
+                          {backtestResults.equity_curve[0]?.date}
+                        </div>
+                        <div style={{ position: 'absolute', bottom: '5px', right: '10px', fontSize: '10px', color: 'var(--muted-foreground)' }}>
+                          {backtestResults.equity_curve[backtestResults.equity_curve.length - 1]?.date}
+                        </div>
+                        <div style={{ position: 'absolute', top: '5px', left: '10px', fontSize: '10px', color: 'var(--muted-foreground)' }}>
+                          High: ${Math.max(...backtestResults.equity_curve.map((d: any) => d.value)).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Drawdown Chart */}
+                  {backtestResults.drawdown_curve && backtestResults.drawdown_curve.length > 0 && (
+                    <div style={{ marginBottom: '20px' }}>
+                      <h4 style={{ marginBottom: '10px' }}>📉 Drawdown</h4>
+                      <div style={{ background: 'var(--muted)', padding: '15px', borderRadius: 'var(--radius)', height: '120px', position: 'relative' }}>
+                        <svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none">
+                          {(() => {
+                            const data = backtestResults.drawdown_curve;
+                            const values = data.map((d: any) => Math.abs(d.drawdown));
+                            const maxDD = Math.max(...values) || 1;
+
+                            const areaPath = `M0,0 ` +
+                              data.map((d: any, i: number) => {
+                                const x = (i / (data.length - 1)) * 100;
+                                const y = (Math.abs(d.drawdown) / maxDD) * 90;
+                                return `L${x},${y}`;
+                              }).join(' ') + ` L100,0 Z`;
+
+                            return (
+                              <path d={areaPath} fill="#ef4444" opacity="0.5" />
+                            );
+                          })()}
+                        </svg>
+                        <div style={{ position: 'absolute', bottom: '5px', right: '10px', fontSize: '10px', color: 'var(--destructive)' }}>
+                          Max DD: {Math.min(...backtestResults.drawdown_curve.map((d: any) => d.drawdown)).toFixed(2)}%
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Monthly Returns Heatmap */}
+                  {backtestResults.monthly_returns && backtestResults.monthly_returns.length > 0 && (
+                    <div style={{ marginBottom: '20px' }}>
+                      <h4 style={{ marginBottom: '10px' }}>📅 Monthly Returns</h4>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                        {backtestResults.monthly_returns.map((m: any, i: number) => (
+                          <div
+                            key={i}
+                            style={{
+                              width: '50px',
+                              padding: '6px',
+                              borderRadius: '4px',
+                              background: m.return >= 0
+                                ? `rgba(34, 197, 94, ${Math.min(Math.abs(m.return) / 10, 1)})`
+                                : `rgba(239, 68, 68, ${Math.min(Math.abs(m.return) / 10, 1)})`,
+                              textAlign: 'center',
+                              fontSize: '10px'
+                            }}
+                            title={`${m.month}: ${m.return.toFixed(2)}%`}
+                          >
+                            <div style={{ color: 'var(--muted-foreground)', fontSize: '8px' }}>{m.month?.slice(5, 7) || ''}</div>
+                            <div style={{ fontWeight: 'bold', color: m.return >= 0 ? '#22c55e' : '#ef4444' }}>
+                              {m.return >= 0 ? '+' : ''}{m.return.toFixed(1)}%
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Trade Statistics - for simple backtest format */}
+                  {backtestResults.trades && (
+                    <>
+                      <h4 style={{ marginTop: '20px', marginBottom: '15px' }}>Trade Statistics</h4>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '10px', marginBottom: '20px' }}>
+                        <div>
+                          <div style={{ fontSize: '11px', color: 'var(--muted-foreground)' }}>Total Trades</div>
+                          <div style={{ fontSize: '16px', fontWeight: 'bold' }}>{backtestResults.trades.total}</div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '11px', color: 'var(--muted-foreground)' }}>Win Rate</div>
+                          <div style={{ fontSize: '16px', fontWeight: 'bold', color: backtestResults.trades.win_rate_pct >= 50 ? '#22c55e' : 'var(--destructive)' }}>
+                            {backtestResults.trades.win_rate_pct?.toFixed(1)}%
+                          </div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '11px', color: 'var(--muted-foreground)' }}>Winning</div>
+                          <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#22c55e' }}>{backtestResults.trades.winning}</div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '11px', color: 'var(--muted-foreground)' }}>Losing</div>
+                          <div style={{ fontSize: '16px', fontWeight: 'bold', color: 'var(--destructive)' }}>{backtestResults.trades.losing}</div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '11px', color: 'var(--muted-foreground)' }}>Avg Win</div>
+                          <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#22c55e' }}>+{backtestResults.trades.avg_win_pct?.toFixed(2)}%</div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '11px', color: 'var(--muted-foreground)' }}>Avg Loss</div>
+                          <div style={{ fontSize: '16px', fontWeight: 'bold', color: 'var(--destructive)' }}>{backtestResults.trades.avg_loss_pct?.toFixed(2)}%</div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '11px', color: 'var(--muted-foreground)' }}>Profit Factor</div>
+                          <div style={{ fontSize: '16px', fontWeight: 'bold', color: backtestResults.trades.profit_factor >= 1.5 ? '#22c55e' : backtestResults.trades.profit_factor >= 1 ? '#f59e0b' : 'var(--destructive)' }}>
+                            {backtestResults.trades.profit_factor?.toFixed(2)}
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  {/* VectorBT Trade Info */}
+                  {backtestResults.total_trades !== undefined && !backtestResults.trades && (
+                    <div style={{ display: 'flex', gap: '20px', padding: '10px', background: 'var(--accent)', borderRadius: 'var(--radius)' }}>
+                      <div>
+                        <span style={{ fontSize: '11px', color: 'var(--muted-foreground)' }}>Positions: </span>
+                        <span style={{ fontWeight: 'bold' }}>{backtestResults.total_trades}</span>
+                      </div>
+                      {(backtestResults.win_rate ?? 0) > 0 && (
+                        <div>
+                          <span style={{ fontSize: '11px', color: 'var(--muted-foreground)' }}>Win Rate: </span>
+                          <span style={{ fontWeight: 'bold', color: (backtestResults.win_rate ?? 0) >= 50 ? '#22c55e' : 'var(--destructive)' }}>{(backtestResults.win_rate ?? 0).toFixed(1)}%</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Recent Trades Table */}
                   {backtestResults.recent_trades && backtestResults.recent_trades.length > 0 && (
                     <>
-                      <h4 style={{ marginTop: '30px', marginBottom: '15px' }}>All Trades ({backtestResults.recent_trades.length} total)</h4>
-                      <div style={{ overflowX: 'auto', maxHeight: '600px', overflowY: 'auto' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                      <h4 style={{ marginTop: '20px', marginBottom: '15px' }}>All Trades ({backtestResults.recent_trades.length} total)</h4>
+                      <div style={{ overflowX: 'auto', maxHeight: '400px', overflowY: 'auto' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
                           <thead style={{ position: 'sticky', top: 0, background: 'var(--muted)', zIndex: 1 }}>
-                            <tr style={{ background: 'var(--muted)' }}>
+                            <tr>
                               <th style={{ padding: '8px', textAlign: 'left' }}>Entry</th>
                               <th style={{ padding: '8px', textAlign: 'left' }}>Exit</th>
                               <th style={{ padding: '8px', textAlign: 'left' }}>Ticker</th>
-                              <th style={{ padding: '8px', textAlign: 'right' }}>Entry Price</th>
-                              <th style={{ padding: '8px', textAlign: 'right' }}>Exit Price</th>
+                              <th style={{ padding: '8px', textAlign: 'right' }}>Entry $</th>
+                              <th style={{ padding: '8px', textAlign: 'right' }}>Exit $</th>
                               <th style={{ padding: '8px', textAlign: 'right' }}>Return</th>
                               <th style={{ padding: '8px', textAlign: 'right' }}>P&L</th>
                             </tr>
                           </thead>
                           <tbody>
-                            {backtestResults.recent_trades.map((trade, i) => (
+                            {backtestResults.recent_trades.map((trade: any, i: number) => (
                               <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
-                                <td style={{ padding: '8px' }}>{new Date(trade.entry_date).toLocaleDateString()}</td>
-                                <td style={{ padding: '8px' }}>{new Date(trade.exit_date).toLocaleDateString()}</td>
-                                <td style={{ padding: '8px', fontWeight: 'bold' }}>{trade.ticker.replace('.BK', '')}</td>
-                                <td style={{ padding: '8px', textAlign: 'right' }}>${trade.entry_price.toFixed(2)}</td>
-                                <td style={{ padding: '8px', textAlign: 'right' }}>${trade.exit_price.toFixed(2)}</td>
-                                <td style={{ padding: '8px', textAlign: 'right', color: trade.return_pct >= 0 ? '#22c55e' : 'var(--destructive)', fontWeight: 'bold' }}>
-                                  {trade.return_pct >= 0 ? '+' : ''}{trade.return_pct.toFixed(2)}%
+                                <td style={{ padding: '6px' }}>{new Date(trade.entry_date).toLocaleDateString()}</td>
+                                <td style={{ padding: '6px' }}>{new Date(trade.exit_date).toLocaleDateString()}</td>
+                                <td style={{ padding: '6px', fontWeight: 'bold' }}>{trade.ticker?.replace('.BK', '')}</td>
+                                <td style={{ padding: '6px', textAlign: 'right' }}>${trade.entry_price?.toFixed(2)}</td>
+                                <td style={{ padding: '6px', textAlign: 'right' }}>${trade.exit_price?.toFixed(2)}</td>
+                                <td style={{ padding: '6px', textAlign: 'right', color: trade.return_pct >= 0 ? '#22c55e' : 'var(--destructive)', fontWeight: 'bold' }}>
+                                  {trade.return_pct >= 0 ? '+' : ''}{trade.return_pct?.toFixed(2)}%
                                 </td>
-                                <td style={{ padding: '8px', textAlign: 'right', color: trade.pnl >= 0 ? '#22c55e' : 'var(--destructive)', fontWeight: 'bold' }}>
-                                  {trade.pnl >= 0 ? '+' : ''}${trade.pnl.toFixed(2)}
+                                <td style={{ padding: '6px', textAlign: 'right', color: trade.pnl >= 0 ? '#22c55e' : 'var(--destructive)', fontWeight: 'bold' }}>
+                                  {trade.pnl >= 0 ? '+' : ''}${trade.pnl?.toFixed(2)}
                                 </td>
                               </tr>
                             ))}
