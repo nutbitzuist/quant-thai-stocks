@@ -531,6 +531,12 @@ export default function Home() {
   const [backtestPositionSize, setBacktestPositionSize] = useState('equal');
   const [backtestMaxPositions, setBacktestMaxPositions] = useState(20);
 
+  // Risk Management state
+  const [stopLoss, setStopLoss] = useState<number | null>(null);
+  const [takeProfit, setTakeProfit] = useState<number | null>(null);
+  const [rebalanceFreq, setRebalanceFreq] = useState('monthly');
+  const [useVectorBT, setUseVectorBT] = useState(true); // Use advanced backtester
+
   // Advanced Backtesting state
   const [tearsheetData, setTearsheetData] = useState<any>(null);
   const [tearsheetLoading, setTearsheetLoading] = useState(false);
@@ -656,23 +662,46 @@ export default function Home() {
   const runBacktest = async () => {
     if (!backtestModel) { log('error', 'Please select a model'); return; }
     setBacktestRunning(true);
-    log('info', `Running backtest for ${backtestModel}...`);
+    setTearsheetData(null); // Clear previous tearsheet
+
+    // Use VectorBT backtester for advanced features
+    const endpoint = useVectorBT ? `${API_URL}/api/backtest/run` : `${API_URL}/api/advanced/backtest`;
+    log('info', `Running ${useVectorBT ? 'advanced' : 'simple'} backtest for ${backtestModel}...`);
+
     try {
-      const r = await fetch(`${API_URL}/api/advanced/backtest`, {
+      const requestBody = useVectorBT ? {
+        model_id: backtestModel,
+        universe: backtestUniverse,
+        initial_capital: backtestCapital,
+        max_positions: backtestMaxPositions,
+        position_size: backtestPositionSize,
+        stop_loss: stopLoss,
+        take_profit: takeProfit,
+        rebalance_freq: rebalanceFreq
+      } : {
+        model_id: backtestModel,
+        universe: backtestUniverse,
+        initial_capital: backtestCapital,
+        holding_period: backtestHoldingPeriod,
+        top_n: backtestTopN
+      };
+
+      const r = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model_id: backtestModel,
-          universe: backtestUniverse,
-          initial_capital: backtestCapital,
-          holding_period: backtestHoldingPeriod,
-          top_n: backtestTopN
-        })
+        body: JSON.stringify(requestBody)
       });
+
       if (r.ok) {
         const d = await r.json();
         setBacktestResults(d);
-        log('success', `Backtest complete: ${d.performance.total_return_pct.toFixed(2)}% return, ${d.trades.win_rate_pct.toFixed(1)}% win rate`);
+
+        // Format success message based on response structure
+        if (useVectorBT) {
+          log('success', `Backtest complete: ${(d.total_return * 100).toFixed(2)}% return, Sharpe: ${d.sharpe_ratio?.toFixed(2) || 'N/A'}`);
+        } else {
+          log('success', `Backtest complete: ${d.performance?.total_return_pct?.toFixed(2) || 0}% return, ${d.trades?.win_rate_pct?.toFixed(1) || 0}% win rate`);
+        }
       } else {
         const e = await r.json();
         log('error', `Backtest failed: ${e.detail || r.statusText}`);
@@ -682,6 +711,67 @@ export default function Home() {
     }
     setBacktestRunning(false);
   };
+
+  // Run Monte Carlo simulation
+  const runMonteCarlo = async () => {
+    if (!backtestModel) { log('error', 'Please select a model first'); return; }
+    setMonteCarloLoading(true);
+    log('info', `Running Monte Carlo simulation for ${backtestModel}...`);
+    try {
+      const r = await fetch(`${API_URL}/api/backtest/monte-carlo`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model_id: backtestModel,
+          universe: backtestUniverse,
+          n_simulations: 1000,
+          time_horizon: 252
+        })
+      });
+      if (r.ok) {
+        const d = await r.json();
+        setMonteCarloResults(d);
+        log('success', `Monte Carlo: ${(d.probability_of_profit * 100).toFixed(1)}% probability of profit, VaR: ${(d.var_95 * 100).toFixed(2)}%`);
+      } else {
+        const e = await r.json();
+        log('error', `Monte Carlo failed: ${e.detail || r.statusText}`);
+      }
+    } catch (e: any) {
+      log('error', `Monte Carlo error: ${e.message || e}`);
+    }
+    setMonteCarloLoading(false);
+  };
+
+  // Run Walk-Forward Analysis
+  const runWalkForward = async () => {
+    if (!backtestModel) { log('error', 'Please select a model first'); return; }
+    setWalkForwardLoading(true);
+    log('info', `Running walk-forward analysis for ${backtestModel}...`);
+    try {
+      const r = await fetch(`${API_URL}/api/backtest/walk-forward`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model_id: backtestModel,
+          universe: backtestUniverse,
+          in_sample_pct: 0.7,
+          n_splits: 5
+        })
+      });
+      if (r.ok) {
+        const d = await r.json();
+        setWalkForwardResults(d);
+        log('success', `Walk-Forward: Robustness score ${(d.robustness_score * 100).toFixed(1)}%`);
+      } else {
+        const e = await r.json();
+        log('error', `Walk-Forward failed: ${e.detail || r.statusText}`);
+      }
+    } catch (e: any) {
+      log('error', `Walk-Forward error: ${e.message || e}`);
+    }
+    setWalkForwardLoading(false);
+  };
+
 
   const downloadBacktestPDF = async (result: BacktestResult) => {
     try {
@@ -1866,7 +1956,64 @@ export default function Home() {
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', gap: '10px' }}>
+                {/* Risk Management Section */}
+                <div style={{ ...S.card, background: 'var(--accent)', padding: '15px', marginBottom: '20px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px' }}>
+                    <span style={{ fontSize: '16px' }}>⚠️</span>
+                    <h4 style={{ margin: 0, fontSize: '14px' }}>Risk Management</h4>
+                    <label style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px' }}>
+                      <input type="checkbox" checked={useVectorBT} onChange={e => setUseVectorBT(e.target.checked)} />
+                      Advanced Mode (VectorBT)
+                    </label>
+                  </div>
+
+                  {useVectorBT && (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '15px' }}>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '5px', fontSize: '12px', fontWeight: 'bold' }}>Stop-Loss %</label>
+                        <select style={{ ...S.select, width: '100%', fontSize: '12px' }} value={stopLoss ?? ''} onChange={e => setStopLoss(e.target.value ? Number(e.target.value) : null)}>
+                          <option value="">None</option>
+                          <option value="0.05">5%</option>
+                          <option value="0.10">10%</option>
+                          <option value="0.15">15%</option>
+                          <option value="0.20">20%</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '5px', fontSize: '12px', fontWeight: 'bold' }}>Take-Profit %</label>
+                        <select style={{ ...S.select, width: '100%', fontSize: '12px' }} value={takeProfit ?? ''} onChange={e => setTakeProfit(e.target.value ? Number(e.target.value) : null)}>
+                          <option value="">None</option>
+                          <option value="0.20">20%</option>
+                          <option value="0.30">30%</option>
+                          <option value="0.50">50%</option>
+                          <option value="1.00">100%</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '5px', fontSize: '12px', fontWeight: 'bold' }}>Rebalance</label>
+                        <select style={{ ...S.select, width: '100%', fontSize: '12px' }} value={rebalanceFreq} onChange={e => setRebalanceFreq(e.target.value)}>
+                          <option value="daily">Daily</option>
+                          <option value="weekly">Weekly</option>
+                          <option value="monthly">Monthly</option>
+                          <option value="quarterly">Quarterly</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '5px', fontSize: '12px', fontWeight: 'bold' }}>Max Positions</label>
+                        <input type="number" style={{ ...S.input, fontSize: '12px' }} value={backtestMaxPositions} onChange={e => setBacktestMaxPositions(Number(e.target.value))} min={1} max={50} />
+                      </div>
+                    </div>
+                  )}
+
+                  {!useVectorBT && (
+                    <p style={{ margin: 0, fontSize: '12px', color: 'var(--muted-foreground)' }}>
+                      Enable Advanced Mode to access stop-loss, take-profit, and rebalancing features.
+                    </p>
+                  )}
+                </div>
+
+                {/* Action Buttons */}
+                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                   <button
                     style={{ ...S.btn('primary'), fontSize: '14px', padding: '10px 20px' }}
                     onClick={runBacktest}
@@ -1874,7 +2021,27 @@ export default function Home() {
                   >
                     {backtestRunning ? '⏳ Running Backtest...' : '▶ Run Backtest'}
                   </button>
-                  {backtestModel && (
+
+                  {useVectorBT && backtestModel && (
+                    <>
+                      <button
+                        style={{ ...S.btn('success'), fontSize: '14px', padding: '10px 20px' }}
+                        onClick={runMonteCarlo}
+                        disabled={!backtestModel || monteCarloLoading}
+                      >
+                        {monteCarloLoading ? '⏳ Simulating...' : '🎲 Monte Carlo'}
+                      </button>
+                      <button
+                        style={{ ...S.btn('secondary'), fontSize: '14px', padding: '10px 20px' }}
+                        onClick={runWalkForward}
+                        disabled={!backtestModel || walkForwardLoading}
+                      >
+                        {walkForwardLoading ? '⏳ Analyzing...' : '📈 Walk-Forward'}
+                      </button>
+                    </>
+                  )}
+
+                  {!useVectorBT && backtestModel && (
                     <button
                       style={{ ...S.btn('secondary'), fontSize: '14px', padding: '10px 20px' }}
                       onClick={async () => {
@@ -1902,6 +2069,84 @@ export default function Home() {
                   )}
                 </div>
               </div>
+
+              {/* Monte Carlo Results */}
+              {monteCarloResults && (
+                <div style={{ ...S.card, borderLeft: '4px solid #8b5cf6' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                    <h3 style={{ margin: 0 }}>🎲 Monte Carlo Simulation</h3>
+                    <button style={{ ...S.btn('secondary'), fontSize: '11px', padding: '4px 8px' }} onClick={() => setMonteCarloResults(null)}>Clear</button>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '15px' }}>
+                    <div style={{ background: 'var(--muted)', padding: '12px', borderRadius: 'var(--radius)', textAlign: 'center' }}>
+                      <div style={{ fontSize: '10px', color: 'var(--muted-foreground)', marginBottom: '4px' }}>Probability of Profit</div>
+                      <div style={{ fontSize: '20px', fontWeight: 'bold', color: monteCarloResults.probability_of_profit >= 0.5 ? '#22c55e' : 'var(--destructive)' }}>
+                        {(monteCarloResults.probability_of_profit * 100).toFixed(1)}%
+                      </div>
+                    </div>
+                    <div style={{ background: 'var(--muted)', padding: '12px', borderRadius: 'var(--radius)', textAlign: 'center' }}>
+                      <div style={{ fontSize: '10px', color: 'var(--muted-foreground)', marginBottom: '4px' }}>Expected Return</div>
+                      <div style={{ fontSize: '20px', fontWeight: 'bold', color: monteCarloResults.expected_return >= 0 ? '#22c55e' : 'var(--destructive)' }}>
+                        {(monteCarloResults.expected_return * 100).toFixed(2)}%
+                      </div>
+                    </div>
+                    <div style={{ background: 'var(--muted)', padding: '12px', borderRadius: 'var(--radius)', textAlign: 'center' }}>
+                      <div style={{ fontSize: '10px', color: 'var(--muted-foreground)', marginBottom: '4px' }}>95% VaR</div>
+                      <div style={{ fontSize: '20px', fontWeight: 'bold', color: 'var(--destructive)' }}>
+                        {(monteCarloResults.var_95 * 100).toFixed(2)}%
+                      </div>
+                    </div>
+                    <div style={{ background: 'var(--muted)', padding: '12px', borderRadius: 'var(--radius)', textAlign: 'center' }}>
+                      <div style={{ fontSize: '10px', color: 'var(--muted-foreground)', marginBottom: '4px' }}>95% CVaR</div>
+                      <div style={{ fontSize: '20px', fontWeight: 'bold', color: 'var(--destructive)' }}>
+                        {(monteCarloResults.cvar_95 * 100).toFixed(2)}%
+                      </div>
+                    </div>
+                  </div>
+                  <p style={{ marginTop: '12px', fontSize: '11px', color: 'var(--muted-foreground)' }}>
+                    Based on {monteCarloResults.simulations?.toLocaleString() || 1000} simulations over 252 trading days
+                  </p>
+                </div>
+              )}
+
+              {/* Walk-Forward Results */}
+              {walkForwardResults && (
+                <div style={{ ...S.card, borderLeft: '4px solid #06b6d4' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                    <h3 style={{ margin: 0 }}>📈 Walk-Forward Analysis</h3>
+                    <button style={{ ...S.btn('secondary'), fontSize: '11px', padding: '4px 8px' }} onClick={() => setWalkForwardResults(null)}>Clear</button>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px' }}>
+                    <div style={{ background: 'var(--muted)', padding: '15px', borderRadius: 'var(--radius)' }}>
+                      <div style={{ fontSize: '11px', color: 'var(--muted-foreground)', marginBottom: '5px' }}>Robustness Score</div>
+                      <div style={{ fontSize: '28px', fontWeight: 'bold', color: walkForwardResults.robustness_score >= 0.7 ? '#22c55e' : walkForwardResults.robustness_score >= 0.5 ? '#f59e0b' : 'var(--destructive)' }}>
+                        {(walkForwardResults.robustness_score * 100).toFixed(1)}%
+                      </div>
+                      <div style={{ fontSize: '10px', color: 'var(--muted-foreground)', marginTop: '4px' }}>
+                        {walkForwardResults.robustness_score >= 0.7 ? '✅ Robust strategy' : walkForwardResults.robustness_score >= 0.5 ? '⚠️ Moderate robustness' : '❌ Potential overfitting'}
+                      </div>
+                    </div>
+                    <div style={{ background: 'var(--muted)', padding: '15px', borderRadius: 'var(--radius)' }}>
+                      <div style={{ fontSize: '11px', color: 'var(--muted-foreground)', marginBottom: '10px' }}>Performance Summary</div>
+                      {walkForwardResults.overall_performance && (
+                        <div style={{ fontSize: '12px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                            <span>In-Sample Avg Return:</span>
+                            <span style={{ fontWeight: 'bold' }}>{((walkForwardResults.overall_performance.in_sample_avg_return || 0) * 100).toFixed(2)}%</span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span>Out-Sample Avg Return:</span>
+                            <span style={{ fontWeight: 'bold' }}>{((walkForwardResults.overall_performance.out_sample_avg_return || 0) * 100).toFixed(2)}%</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <p style={{ marginTop: '12px', fontSize: '11px', color: 'var(--muted-foreground)' }}>
+                    Tested across 5 periods with 70% in-sample / 30% out-of-sample split
+                  </p>
+                </div>
+              )}
 
               {backtestResults && (
                 <div style={S.card}>
