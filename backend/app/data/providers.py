@@ -10,6 +10,13 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# Import SETSMART provider (late import to avoid circular dependency)
+try:
+    from .setsmart_provider import SetsmartProvider
+    SETSMART_AVAILABLE = True
+except ImportError:
+    SETSMART_AVAILABLE = False
+
 
 class DataProvider(ABC):
     """Base class for all data providers"""
@@ -362,7 +369,18 @@ def get_available_providers() -> List[DataProvider]:
     """Get list of all available data providers"""
     providers = []
     
-    # Yahoo Finance (default, most reliable)
+    import os
+    
+    # SETSMART (Official SET Thailand data - prioritize for Thai stocks)
+    if SETSMART_AVAILABLE:
+        setsmart_key = os.getenv("SETSMART_API_KEY")
+        if setsmart_key:
+            setsmart_provider = SetsmartProvider(api_key=setsmart_key)
+            if setsmart_provider.is_available():
+                providers.append(setsmart_provider)
+                logger.info("SETSMART provider enabled for Thai stocks")
+    
+    # Yahoo Finance (default, most reliable for US stocks)
     yf_provider = YahooFinanceProvider()
     if yf_provider.is_available():
         providers.append(yf_provider)
@@ -373,7 +391,6 @@ def get_available_providers() -> List[DataProvider]:
         providers.append(pdr_provider)
     
     # Alpha Vantage (if API key is set)
-    import os
     av_key = os.getenv("ALPHA_VANTAGE_API_KEY")
     if av_key:
         av_provider = AlphaVantageProvider(api_key=av_key)

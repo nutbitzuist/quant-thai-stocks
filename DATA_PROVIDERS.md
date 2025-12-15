@@ -152,12 +152,22 @@ GET /api/status/
 - **Cost**: Free
 - **Installation**: `pip install investpy`
 
+### setsmart ⭐ (Recommended for Thai Stocks)
+- **Best for**: Thai stocks (SET50, SET100) - Official SET data
+- **Coverage**: EOD prices, fundamentals, P/E, P/B, ROE, dividend yields
+- **Rate Limits**: Depends on subscription tier
+- **Cost**: Requires SETSMART subscription
+- **Setup**: Requires `SETSMART_API_KEY` environment variable
+- **Get API key**: Login to [setsmart.com](https://www.setsmart.com) → Tools → API Service
+- **Data quality**: Direct from Stock Exchange of Thailand - most accurate for Thai stocks
+
 ## Best Practices
 
-### For Thai Stocks
+### For Thai Stocks ⭐ (Recommended)
 ```bash
-# Recommended setup
-DATA_PROVIDERS=yfinance,investpy
+# Best setup with SETSMART API (official SET data)
+SETSMART_API_KEY=your_setsmart_api_key
+DATA_PROVIDERS=setsmart,yfinance
 ```
 
 ### For US Stocks
@@ -169,7 +179,7 @@ DATA_PROVIDERS=yfinance,pandas_datareader_yahoo
 ### For Maximum Reliability
 ```bash
 # Use all available providers
-DATA_PROVIDERS=yfinance,pandas_datareader_yahoo,alpha_vantage,investpy
+DATA_PROVIDERS=setsmart,yfinance,pandas_datareader_yahoo,alpha_vantage
 DATA_FALLBACK_ENABLED=true
 ```
 
@@ -188,8 +198,10 @@ DATA_FALLBACK_ENABLED=false
 - Review logs for import errors
 
 ### API Key Issues
-- Alpha Vantage: Set `ALPHA_VANTAGE_API_KEY` environment variable
-- Get free API key at: https://www.alphavantage.co/support/#api-key
+- **SETSMART**: Set `SETSMART_API_KEY` environment variable
+  - Get API key at: [setsmart.com](https://www.setsmart.com) → Tools → API Service
+- **Alpha Vantage**: Set `ALPHA_VANTAGE_API_KEY` environment variable
+  - Get free API key at: https://www.alphavantage.co/support/#api-key
 
 ### Data Quality Issues
 - Enable multiple providers for cross-validation
@@ -200,9 +212,10 @@ DATA_FALLBACK_ENABLED=false
 
 ```
 DataFetcher
-    ├── Provider 1 (yfinance) → Try first
-    ├── Provider 2 (pandas_datareader) → Fallback if Provider 1 fails
-    └── Provider 3 (alpha_vantage) → Fallback if Provider 2 fails
+    ├── Provider 1 (setsmart)         → Best for Thai stocks (if API key set)
+    ├── Provider 2 (yfinance)         → Default, best for US stocks
+    ├── Provider 3 (pandas_datareader) → Fallback
+    └── Provider 4 (alpha_vantage)     → Fallback (if API key set)
 ```
 
 Each provider implements the `DataProvider` interface:

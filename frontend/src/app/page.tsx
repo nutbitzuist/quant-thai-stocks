@@ -539,7 +539,7 @@ const StockAnalyzer = () => {
 };
 
 export default function Home() {
-  const [tab, setTab] = useState<'models' | 'advanced' | 'backtest' | 'universe' | 'model-detail' | 'history' | 'status' | 'settings' | 'analysis'>('models');
+  const [tab, setTab] = useState<'models' | 'advanced' | 'backtest' | 'universe' | 'model-detail' | 'history' | 'status' | 'settings' | 'analysis' | 'screening'>('models');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [modelSubTab, setModelSubTab] = useState<'all' | 'technical' | 'fundamental' | 'quantitative'>('all');
   const [advancedSubTab, setAdvancedSubTab] = useState<'combiner' | 'enhanced-combiner' | 'sector' | 'regime' | 'validation' | 'scheduled'>('combiner');
@@ -1465,7 +1465,7 @@ export default function Home() {
   const downloadPDF = async (id: string) => {
     try {
       log('info', `Downloading PDF for run: ${id}`);
-      const r = await fetch(`${API_URL}/api/models/history/${id}/pdf`);
+      const r = await fetch(`${API_URL}/api/models/history/${id}/pdf?limit=${topN}`);
       if (r.ok) {
         const contentType = r.headers.get('content-type');
         if (contentType && contentType.includes('application/pdf')) {
@@ -1690,6 +1690,7 @@ export default function Home() {
   const mainMenuItems = [
     { id: 'models', icon: '📚', label: 'Models' },
     { id: 'analysis', icon: '🔍', label: 'Analysis' },
+    { id: 'screening', icon: '🏭', label: 'Screening' },
     { id: 'advanced', icon: '⚡', label: 'Advanced' },
     { id: 'backtest', icon: '📊', label: 'Backtest' },
     { id: 'universe', icon: '🌐', label: 'Universe' },
@@ -1935,6 +1936,80 @@ export default function Home() {
 
           {/* STOCK ANALYZER */}
           {tab === 'analysis' && <StockAnalyzer />}
+
+          {/* SCREENING - Sector Browser & Financial Statements */}
+          {tab === 'screening' && (
+            <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+              <div style={S.card}>
+                <h2 style={{ marginTop: 0 }}>🏭 Thai Stock Screening</h2>
+                <p style={{ color: 'var(--muted-foreground)' }}>Browse by SET sector and view financial statements via SETSMART API.</p>
+
+                {/* Sector Grid */}
+                <h3 style={{ marginTop: '20px' }}>📊 SET Sectors</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '10px', marginBottom: '25px' }}>
+                  {['Technology', 'Financials', 'Energy', 'Healthcare', 'Consumer', 'Industrials', 'Real Estate', 'Materials'].map(s => (
+                    <button
+                      key={s}
+                      style={{ ...S.btn('secondary'), width: '100%', padding: '12px', textAlign: 'left' as const }}
+                      onClick={async () => {
+                        try {
+                          const r = await fetch(`${API_URL}/api/screening/by-sector/${s}`);
+                          if (r.ok) {
+                            const d = await r.json();
+                            alert(`${s}: ${d.count || 0} stocks\n\n${(d.stocks || []).slice(0, 5).map((x: { ticker?: string }) => `• ${x.ticker || 'N/A'}`).join('\n')}`);
+                          }
+                        } catch (err) { console.error(err); }
+                      }}
+                    >{s}</button>
+                  ))}
+                </div>
+
+                {/* Financial Lookup */}
+                <h3>📑 Financial Statements</h3>
+                <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
+                  <input
+                    id="fin-ticker"
+                    style={{ ...S.input, marginBottom: 0, maxWidth: '180px' }}
+                    placeholder="PTT, ADVANC, SCB"
+                    onKeyDown={async (e) => {
+                      if (e.key === 'Enter') {
+                        const t = (e.target as HTMLInputElement).value.toUpperCase();
+                        if (t) {
+                          try {
+                            const r = await fetch(`${API_URL}/api/screening/financials/${t}`);
+                            if (r.ok) {
+                              const d = await r.json();
+                              const i = d.income_statement?.slice(-1)[0] || {};
+                              const b = d.balance_sheet?.slice(-1)[0] || {};
+                              alert(`${t}.BK\nRevenue: ${i.revenue ? (i.revenue / 1e6).toFixed(0) + 'M' : '-'}\nNet Income: ${i.net_income ? (i.net_income / 1e6).toFixed(0) + 'M' : '-'}\nAssets: ${b.total_assets ? (b.total_assets / 1e6).toFixed(0) + 'M' : '-'}`);
+                            }
+                          } catch (err) { console.error(err); }
+                        }
+                      }
+                    }}
+                  />
+                  <button
+                    style={S.btn('primary')}
+                    onClick={async () => {
+                      const el = document.getElementById('fin-ticker') as HTMLInputElement;
+                      const t = el?.value?.toUpperCase();
+                      if (!t) return;
+                      try {
+                        const r = await fetch(`${API_URL}/api/screening/financials/${t}`);
+                        if (r.ok) {
+                          const d = await r.json();
+                          const i = d.income_statement?.slice(-1)[0] || {};
+                          const b = d.balance_sheet?.slice(-1)[0] || {};
+                          alert(`${t}.BK\nRevenue: ${i.revenue ? (i.revenue / 1e6).toFixed(0) + 'M' : '-'}\nNet Income: ${i.net_income ? (i.net_income / 1e6).toFixed(0) + 'M' : '-'}\nAssets: ${b.total_assets ? (b.total_assets / 1e6).toFixed(0) + 'M' : '-'}`);
+                        }
+                      } catch (err) { console.error(err); }
+                    }}
+                  >Get</button>
+                </div>
+                <p style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>💡 Enter ticker without .BK suffix. Data from SETSMART API.</p>
+              </div>
+            </div>
+          )}
 
           {/* UNIVERSE MANAGER */}
           {tab === 'universe' && (

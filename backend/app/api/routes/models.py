@@ -277,7 +277,7 @@ async def get_run_details(run_id: str):
 
 
 @router.get("/history/{run_id}/pdf")
-async def export_run_pdf(run_id: str):
+async def export_run_pdf(run_id: str, limit: int = Query(15, description="Number of top signals to inclusion")):
     """Export a run result as PDF"""
     try:
         history_service = get_history_service()
@@ -300,10 +300,10 @@ async def export_run_pdf(run_id: str):
                 buy_signals=record.buy_signals,
                 sell_signals=record.sell_signals,
                 total_analyzed=record.total_analyzed,
-                stocks_with_data=record.stocks_with_data,
                 parameters=record.parameters,
                 description=description,
-                run_timestamp=record.run_timestamp
+                run_timestamp=record.run_timestamp,
+                limit=limit
             )
         except Exception as e:
             logger.error(f"Error generating PDF for run {run_id}: {str(e)}", exc_info=True)
@@ -370,10 +370,10 @@ async def export_current_pdf(request: RunModelRequest):
         buy_signals=result.buy_signals,
         sell_signals=result.sell_signals,
         total_analyzed=result.total_stocks_analyzed,
-        stocks_with_data=result.stocks_with_data,
         parameters=result.parameters,
         description=description,
-        run_timestamp=result.run_timestamp
+        run_timestamp=result.run_timestamp,
+        limit=result.parameters.get('top_n', 15) if result.parameters else 15
     )
     
     # Generate readable filename: ModelName_Universe_YYYY-MM-DD_HHMMSS.pdf

@@ -32,6 +32,7 @@ class Signal:
     score: float  # 0-100, higher = stronger signal
     price: float
     timestamp: datetime
+    reason: Optional[str] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
     
     def to_dict(self) -> Dict:
@@ -39,6 +40,7 @@ class Signal:
             "ticker": self.ticker,
             "signal_type": self.signal_type.value,
             "score": round(self.score, 2),
+            "reason": self.reason,
             "price_at_signal": round(self.price, 2) if self.price else 0,
             "timestamp": self.timestamp.isoformat(),
             "metadata": self.metadata
@@ -140,7 +142,9 @@ class BaseModel(ABC):
                 
                 # Create metadata from extra columns
                 metadata = {k: v for k, v in row.items() 
-                           if k not in ['ticker', 'score', 'signal_type']}
+                           if k not in ['ticker', 'score', 'signal_type', 'reason']}
+                
+                reason = row.get('reason')
                 
                 signal = Signal(
                     ticker=ticker,
@@ -148,6 +152,7 @@ class BaseModel(ABC):
                     score=score,
                     price=price,
                     timestamp=datetime.now(),
+                    reason=reason,
                     metadata=metadata
                 )
                 
@@ -158,6 +163,7 @@ class BaseModel(ABC):
                     "ticker": ticker,
                     "score": round(score, 2),
                     "signal": signal_type.value,
+                    "reason": reason,
                     "price": round(price, 2) if price else 0,
                     **{k: round(v, 4) if isinstance(v, float) else v 
                        for k, v in metadata.items()}

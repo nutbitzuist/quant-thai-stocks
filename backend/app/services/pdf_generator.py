@@ -170,7 +170,8 @@ class PDFReportGenerator:
         stocks_with_data: int,
         parameters: Dict,
         description: str = "",
-        run_timestamp: str = None
+        run_timestamp: str = None,
+        limit: int = 15
     ) -> bytes:
         """
         Generate a PDF report for model results
@@ -262,9 +263,9 @@ class PDFReportGenerator:
         
         # Buy Signals Table
         if buy_signals:
-            story.append(Paragraph("Buy Signals", self.styles['SectionHeader']))
+            story.append(Paragraph(f"Buy Signals (Top {len(buy_signals[:limit])})", self.styles['SectionHeader']))
             buy_data = [['Rank', 'Ticker', 'Score', 'Price']]
-            for i, signal in enumerate(buy_signals[:15], 1):
+            for i, signal in enumerate(buy_signals[:limit], 1):
                 buy_data.append([
                     str(i),
                     signal.get('ticker', '').replace('.BK', ''),
@@ -291,9 +292,9 @@ class PDFReportGenerator:
         
         # Sell Signals Table
         if sell_signals:
-            story.append(Paragraph("Sell Signals", self.styles['SectionHeader']))
+            story.append(Paragraph(f"Sell Signals (Top {len(sell_signals[:limit])})", self.styles['SectionHeader']))
             sell_data = [['Rank', 'Ticker', 'Score', 'Price']]
-            for i, signal in enumerate(sell_signals[:15], 1):
+            for i, signal in enumerate(sell_signals[:limit], 1):
                 sell_data.append([
                     str(i),
                     signal.get('ticker', '').replace('.BK', ''),
