@@ -1732,9 +1732,9 @@ export default function Home() {
     <div style={{ minHeight: '100vh', background: 'var(--background)', color: 'var(--foreground)', display: 'flex' }}>
       {/* Sidebar */}
       <div style={{
-        width: sidebarCollapsed ? '60px' : '220px',
+        width: sidebarCollapsed ? '70px' : '240px',
         background: 'var(--card)',
-        borderRight: '1px solid var(--border)',
+        borderRight: '3px solid var(--border)',
         display: 'flex',
         flexDirection: 'column',
         transition: 'width 0.2s ease',
@@ -1742,14 +1742,15 @@ export default function Home() {
         height: '100vh',
         position: 'sticky',
         top: 0,
-        overflowY: 'auto'
+        overflowY: 'auto',
+        fontFamily: 'var(--font-sans)'
       }}>
         {/* Sidebar Header */}
-        <div style={{ padding: '1rem', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          {!sidebarCollapsed && <span style={{ fontWeight: '600', fontSize: '0.9rem' }}>📈 Quant v2.0.2</span>}
+        <div style={{ padding: '1rem', borderBottom: '3px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          {!sidebarCollapsed && <span style={{ fontWeight: '800', fontSize: '1rem', fontFamily: 'var(--font-sans)', letterSpacing: '-0.5px' }}>📈 QUANT v2.0.2</span>}
           <button
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', fontSize: '1.2rem', color: 'var(--muted-foreground)' }}
+            style={{ background: 'var(--card)', border: '2px solid var(--border)', cursor: 'pointer', padding: '6px 8px', fontSize: '1rem', color: 'var(--foreground)', fontWeight: '700', boxShadow: '2px 2px 0 var(--border)' }}
             title={sidebarCollapsed ? 'Expand' : 'Collapse'}
           >
             {sidebarCollapsed ? '→' : '←'}
@@ -1757,9 +1758,9 @@ export default function Home() {
         </div>
 
         {/* Connection Status */}
-        <div style={{ padding: '0.75rem 1rem', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <div style={{ padding: '0.75rem 1rem', borderBottom: '3px solid var(--border)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <span style={S.dot(connected)} />
-          {!sidebarCollapsed && <span style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>{connected ? 'Connected' : 'Disconnected'}</span>}
+          {!sidebarCollapsed && <span style={{ fontSize: '0.8rem', fontWeight: '600', color: 'var(--muted-foreground)', fontFamily: 'var(--font-sans)', textTransform: 'uppercase' as const }}>{connected ? 'Connected' : 'Disconnected'}</span>}
         </div>
 
         {/* Main Menu */}
@@ -1770,20 +1771,24 @@ export default function Home() {
                 onClick={() => setTab(item.id)}
                 style={{
                   width: '100%',
-                  padding: sidebarCollapsed ? '0.75rem' : '0.6rem 0.75rem',
-                  background: tab === item.id ? 'var(--primary)' : 'transparent',
-                  color: tab === item.id ? 'var(--primary-foreground)' : 'var(--foreground)',
-                  border: 'none',
-                  borderRadius: 'var(--radius)',
+                  padding: sidebarCollapsed ? '0.75rem' : '0.75rem 1rem',
+                  background: tab === item.id ? 'var(--primary)' : 'var(--card)',
+                  color: tab === item.id ? '#ffffff' : 'var(--foreground)',
+                  border: tab === item.id ? '3px solid var(--border)' : '2px solid transparent',
+                  borderRadius: '0',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '0.5rem',
+                  gap: '0.6rem',
                   fontSize: '0.875rem',
-                  fontWeight: tab === item.id ? '600' : '400',
-                  marginBottom: '2px',
+                  fontWeight: '700',
+                  fontFamily: 'var(--font-sans)',
+                  marginBottom: '4px',
                   justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
-                  transition: 'all 0.15s ease'
+                  transition: 'all 0.1s ease',
+                  boxShadow: tab === item.id ? '3px 3px 0 var(--border)' : 'none',
+                  textTransform: 'uppercase' as const,
+                  letterSpacing: '0.3px'
                 }}
                 title={sidebarCollapsed ? item.label : undefined}
               >
@@ -1793,22 +1798,25 @@ export default function Home() {
 
               {/* Sub-menu for Models */}
               {item.id === 'models' && tab === 'models' && !sidebarCollapsed && (
-                <div style={{ marginLeft: '1rem', marginTop: '4px', marginBottom: '8px' }}>
+                <div style={{ marginLeft: '1rem', marginTop: '6px', marginBottom: '10px', borderLeft: '3px solid var(--border)', paddingLeft: '8px' }}>
                   {modelSubMenuItems.map(sub => (
                     <button
                       key={sub.id}
                       onClick={() => setModelSubTab(sub.id)}
                       style={{
                         width: '100%',
-                        padding: '0.4rem 0.6rem',
+                        padding: '0.5rem 0.75rem',
                         background: modelSubTab === sub.id ? 'var(--muted)' : 'transparent',
                         color: modelSubTab === sub.id ? 'var(--foreground)' : 'var(--muted-foreground)',
-                        border: 'none',
-                        borderRadius: 'var(--radius)',
+                        border: modelSubTab === sub.id ? '2px solid var(--border)' : '2px solid transparent',
+                        borderRadius: '0',
                         cursor: 'pointer',
                         fontSize: '0.8rem',
+                        fontWeight: '600',
+                        fontFamily: 'var(--font-sans)',
                         textAlign: 'left',
-                        marginBottom: '2px'
+                        marginBottom: '3px',
+                        boxShadow: modelSubTab === sub.id ? '2px 2px 0 var(--border)' : 'none'
                       }}
                     >
                       {sub.label}
@@ -1819,22 +1827,25 @@ export default function Home() {
 
               {/* Sub-menu for Advanced */}
               {item.id === 'advanced' && tab === 'advanced' && !sidebarCollapsed && (
-                <div style={{ marginLeft: '1rem', marginTop: '4px', marginBottom: '8px' }}>
+                <div style={{ marginLeft: '1rem', marginTop: '6px', marginBottom: '10px', borderLeft: '3px solid var(--border)', paddingLeft: '8px' }}>
                   {advancedSubMenuItems.map(sub => (
                     <button
                       key={sub.id}
                       onClick={() => setAdvancedSubTab(sub.id)}
                       style={{
                         width: '100%',
-                        padding: '0.4rem 0.6rem',
+                        padding: '0.5rem 0.75rem',
                         background: advancedSubTab === sub.id ? 'var(--muted)' : 'transparent',
                         color: advancedSubTab === sub.id ? 'var(--foreground)' : 'var(--muted-foreground)',
-                        border: 'none',
-                        borderRadius: 'var(--radius)',
+                        border: advancedSubTab === sub.id ? '2px solid var(--border)' : '2px solid transparent',
+                        borderRadius: '0',
                         cursor: 'pointer',
                         fontSize: '0.8rem',
+                        fontWeight: '600',
+                        fontFamily: 'var(--font-sans)',
                         textAlign: 'left',
-                        marginBottom: '2px'
+                        marginBottom: '3px',
+                        boxShadow: advancedSubTab === sub.id ? '2px 2px 0 var(--border)' : 'none'
                       }}
                     >
                       {sub.label}
@@ -1847,8 +1858,8 @@ export default function Home() {
         </div>
 
         {/* Universe Selector at bottom */}
-        <div style={{ padding: sidebarCollapsed ? '0.5rem' : '0.75rem', borderTop: '1px solid var(--border)' }}>
-          {!sidebarCollapsed && <label style={{ fontSize: '0.7rem', color: 'var(--muted-foreground)', display: 'block', marginBottom: '4px' }}>Universe</label>}
+        <div style={{ padding: sidebarCollapsed ? '0.5rem' : '1rem', borderTop: '3px solid var(--border)' }}>
+          {!sidebarCollapsed && <label style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--muted-foreground)', display: 'block', marginBottom: '6px', textTransform: 'uppercase' as const, letterSpacing: '0.5px', fontFamily: 'var(--font-sans)' }}>Universe</label>}
           <UniverseSelector
             current={universe}
             universes={universes}
@@ -4028,8 +4039,8 @@ function ModelCard({ model, result, running, onRun, onPDF, onEnhancedPDF, onRunW
     <div style={S.card}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          <h3 style={{ margin: 0 }}>{model.name}</h3>
-          <span style={{ fontSize: '11px', padding: '2px 6px', borderRadius: 'var(--radius)', background: catStyle.bg, color: catStyle.color }}>{model.category}</span>
+          <h3 style={{ margin: 0, fontFamily: 'var(--font-sans)', fontWeight: '700' }}>{model.name}</h3>
+          <span style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '0', background: catStyle.bg, color: catStyle.color, border: '2px solid var(--border)', fontWeight: '700', textTransform: 'uppercase' as const, display: 'inline-block', marginTop: '6px' }}>{model.category}</span>
         </div>
         <div style={{ display: 'flex', gap: '5px' }}>
           <button style={{ ...S.btn('secondary'), fontSize: '11px', padding: '4px 8px' }} onClick={() => setShowParams(!showParams)} title="Customize Parameters">⚙️</button>
@@ -4040,10 +4051,10 @@ function ModelCard({ model, result, running, onRun, onPDF, onEnhancedPDF, onRunW
 
       {/* Parameter Customization Panel */}
       {showParams && model.default_parameters && (
-        <div style={{ background: 'var(--muted)', padding: '12px', borderRadius: 'var(--radius)', marginBottom: '10px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-            <h4 style={{ margin: 0, fontSize: '13px' }}>⚙️ Custom Parameters</h4>
-            <button style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px' }} onClick={() => setShowParams(false)}>✕</button>
+        <div style={{ background: 'var(--muted)', padding: '16px', borderRadius: '0', marginBottom: '12px', border: '3px solid var(--border)', boxShadow: '4px 4px 0 var(--border)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', borderBottom: '2px solid var(--border)', paddingBottom: '10px' }}>
+            <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '700', fontFamily: 'var(--font-sans)', textTransform: 'uppercase' as const }}>⚙️ Custom Parameters</h4>
+            <button style={{ background: 'var(--card)', border: '2px solid var(--border)', cursor: 'pointer', fontSize: '14px', padding: '4px 8px', fontWeight: '700', boxShadow: '2px 2px 0 var(--border)' }} onClick={() => setShowParams(false)}>✕</button>
           </div>
           <div style={{ display: 'grid', gap: '8px' }}>
             {Object.entries(model.default_parameters).map(([key, defaultValue]) => (
