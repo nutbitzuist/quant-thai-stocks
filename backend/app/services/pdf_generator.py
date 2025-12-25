@@ -200,6 +200,8 @@ class PDFReportGenerator:
         # Metadata with improved styling
         generated_time = self._format_datetime_gmt7(run_timestamp) if run_timestamp else self._format_datetime_gmt7()
         meta_text = f"""
+        <b>Generated:</b> {generated_time}<br/>
+        <b>Generated from:</b> Quant Stock Analysis, quant.myalgostack.com<br/>
         <b>Universe:</b> {universe.upper()}<br/>
         <b>Stocks Analyzed:</b> {stocks_with_data} / {total_analyzed}
         """
@@ -323,7 +325,7 @@ class PDFReportGenerator:
         story.append(HRFlowable(width="100%", thickness=1, color=self.colors['border']))
         story.append(Spacer(1, 12))
         footer_text = f"""
-        <b>Quant Stock Analysis v2</b><br/>
+        <b>Quant Stock Analysis</b>, quant.myalgostack.com<br/>
         Generated on {generated_time}
         """
         story.append(Paragraph(footer_text, self.styles['FooterText']))
@@ -480,7 +482,7 @@ class PDFReportGenerator:
         story.append(HRFlowable(width="100%", thickness=1, color=self.colors['border']))
         story.append(Spacer(1, 12))
         footer_text = f"""
-        <b>Quant Stock Analysis v2</b><br/>
+        <b>Quant Stock Analysis</b>, quant.myalgostack.com<br/>
         Generated on {generated_time}
         """
         story.append(Paragraph(footer_text, self.styles['FooterText']))
@@ -514,15 +516,17 @@ class PDFReportGenerator:
         story = []
         
         # Title
-        story.append(Paragraph("🔗 Signal Combiner Report", self.styles['CustomTitle']))
+        story.append(Paragraph("Signal Combiner Report", self.styles['CustomTitle']))
         story.append(Paragraph(
             f"Multi-Model Consensus Analysis • {universe.upper()}",
             self.styles['BodyText']
         ))
         
         # Metadata
+        generated_time = self._format_datetime_gmt7(timestamp)
         meta_text = f"""
-        <b>Generated:</b> {timestamp or datetime.now().strftime('%Y-%m-%d %H:%M:%S')}<br/>
+        <b>Generated:</b> {generated_time}<br/>
+        <b>Generated from:</b> Quant Stock Analysis, quant.myalgostack.com<br/>
         <b>Universe:</b> {universe.upper()}<br/>
         <b>Models Analyzed:</b> {total_models}<br/>
         <b>Min Confirmation:</b> {min_confirmation} models
@@ -623,13 +627,13 @@ class PDFReportGenerator:
             story.append(sell_table)
         
         # Footer with website name, date, and time
-        generated_time = self._format_datetime_gmt7(timestamp)
+        footer_time = self._format_datetime_gmt7(timestamp)
         story.append(Spacer(1, 40))
         story.append(HRFlowable(width="100%", thickness=1, color=self.colors['border']))
         story.append(Spacer(1, 12))
         footer_text = f"""
-        <b>Quant Stock Analysis v2</b><br/>
-        Generated on {generated_time}
+        <b>Quant Stock Analysis</b>, quant.myalgostack.com<br/>
+        Generated on {footer_time}
         """
         story.append(Paragraph(footer_text, self.styles['FooterText']))
         
@@ -658,7 +662,7 @@ class PDFReportGenerator:
         story = []
         
         # Title
-        story.append(Paragraph("🔄 Sector Rotation Analysis", self.styles['CustomTitle']))
+        story.append(Paragraph("Sector Rotation Analysis", self.styles['CustomTitle']))
         story.append(Paragraph(
             f"Sector Performance Rankings • {universe.upper()}",
             self.styles['BodyText']
@@ -716,13 +720,13 @@ class PDFReportGenerator:
         story.append(sector_table)
         
         # Footer with website name, date, and time
-        generated_time = self._format_datetime_gmt7(timestamp)
+        footer_time = self._format_datetime_gmt7(timestamp)
         story.append(Spacer(1, 40))
         story.append(HRFlowable(width="100%", thickness=1, color=self.colors['border']))
         story.append(Spacer(1, 12))
         footer_text = f"""
-        <b>Quant Stock Analysis v2</b><br/>
-        Generated on {generated_time}
+        <b>Quant Stock Analysis</b>, quant.myalgostack.com<br/>
+        Generated on {footer_time}
         """
         story.append(Paragraph(footer_text, self.styles['FooterText']))
         
@@ -858,13 +862,13 @@ class PDFReportGenerator:
             story.append(signals_table)
         
         # Footer with website name, date, and time
-        generated_time = self._format_datetime_gmt7(timestamp)
+        footer_time = self._format_datetime_gmt7(timestamp)
         story.append(Spacer(1, 40))
         story.append(HRFlowable(width="100%", thickness=1, color=self.colors['border']))
         story.append(Spacer(1, 12))
         footer_text = f"""
-        <b>Quant Stock Analysis v2</b><br/>
-        Generated on {generated_time}
+        <b>Quant Stock Analysis</b>, quant.myalgostack.com<br/>
+        Generated on {footer_time}
         """
         story.append(Paragraph(footer_text, self.styles['FooterText']))
         
@@ -1062,7 +1066,7 @@ class PDFReportGenerator:
         story.append(HRFlowable(width="100%", thickness=1, color=self.colors['border']))
         story.append(Spacer(1, 12))
         footer_text = f"""
-        <b>Quant Stock Analysis v2 - Enhanced Report</b><br/>
+        <b>Quant Stock Analysis</b>, quant.myalgostack.com<br/>
         Generated on {generated_time}
         """
         story.append(Paragraph(footer_text, self.styles['FooterText']))
