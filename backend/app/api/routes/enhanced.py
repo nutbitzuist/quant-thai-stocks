@@ -601,7 +601,7 @@ async def export_enhanced_pdf(request: EnhancedPDFRequest):
                     buy_signals.append({
                         'ticker': signal_obj.ticker,
                         'score': signal_obj.score,
-                        'price_at_signal': signal_obj.price_at_signal,
+                        'price_at_signal': signal_obj.price,
                         'enhanced_context': enhanced.to_dict() if enhanced else {}
                     })
                 except Exception as e:
@@ -609,7 +609,7 @@ async def export_enhanced_pdf(request: EnhancedPDFRequest):
                     buy_signals.append({
                         'ticker': signal_obj.ticker,
                         'score': signal_obj.score,
-                        'price_at_signal': signal_obj.price_at_signal,
+                        'price_at_signal': signal_obj.price,
                         'enhanced_context': {}
                     })
             
@@ -627,7 +627,7 @@ async def export_enhanced_pdf(request: EnhancedPDFRequest):
                     sell_signals.append({
                         'ticker': signal_obj.ticker,
                         'score': signal_obj.score,
-                        'price_at_signal': signal_obj.price_at_signal,
+                        'price_at_signal': signal_obj.price,
                         'enhanced_context': enhanced.to_dict() if enhanced else {}
                     })
                 except Exception as e:
@@ -635,7 +635,7 @@ async def export_enhanced_pdf(request: EnhancedPDFRequest):
                     sell_signals.append({
                         'ticker': signal_obj.ticker,
                         'score': signal_obj.score,
-                        'price_at_signal': signal_obj.price_at_signal,
+                        'price_at_signal': signal_obj.price,
                         'enhanced_context': {}
                     })
         else:
@@ -644,14 +644,14 @@ async def export_enhanced_pdf(request: EnhancedPDFRequest):
                 buy_signals.append({
                     'ticker': signal_obj.ticker,
                     'score': signal_obj.score,
-                    'price_at_signal': signal_obj.price_at_signal,
+                    'price_at_signal': signal_obj.price,
                     'enhanced_context': {}
                 })
             for signal_obj in sell_signal_objs:
                 sell_signals.append({
                     'ticker': signal_obj.ticker,
                     'score': signal_obj.score,
-                    'price_at_signal': signal_obj.price_at_signal,
+                    'price_at_signal': signal_obj.price,
                     'enhanced_context': {}
                 })
         
