@@ -295,6 +295,7 @@ async def export_run_pdf(run_id: str, limit: int = Query(15, description="Number
             buy_signals = record.get('buy_signals', [])
             sell_signals = record.get('sell_signals', [])
             total_analyzed = record.get('total_analyzed', 0)
+            stocks_with_data = record.get('stocks_with_data', total_analyzed)
             parameters = record.get('parameters', {})
             run_timestamp = record.get('run_timestamp', '')
         else:
@@ -305,6 +306,7 @@ async def export_run_pdf(run_id: str, limit: int = Query(15, description="Number
             buy_signals = record.buy_signals
             sell_signals = record.sell_signals
             total_analyzed = record.total_analyzed
+            stocks_with_data = record.stocks_with_data
             parameters = record.parameters
             run_timestamp = record.run_timestamp
         
@@ -322,6 +324,7 @@ async def export_run_pdf(run_id: str, limit: int = Query(15, description="Number
                 buy_signals=buy_signals,
                 sell_signals=sell_signals,
                 total_analyzed=total_analyzed,
+                stocks_with_data=stocks_with_data,
                 parameters=parameters,
                 description=description,
                 run_timestamp=run_timestamp,
@@ -392,6 +395,7 @@ async def export_current_pdf(request: RunModelRequest):
         buy_signals=result.buy_signals,
         sell_signals=result.sell_signals,
         total_analyzed=result.total_stocks_analyzed,
+        stocks_with_data=result.stocks_with_data,
         parameters=result.parameters,
         description=description,
         run_timestamp=result.run_timestamp,
