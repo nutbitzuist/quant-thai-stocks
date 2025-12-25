@@ -539,14 +539,30 @@ async def export_enhanced_pdf(request: EnhancedPDFRequest):
         price_data = fetcher.get_bulk_price_data(tickers, period="1y")
         fundamental_data = fetcher.get_bulk_fundamental_data(tickers)
         
-        # Get market regime
+        # Get market regime - use appropriate index based on universe
         market_regime = None
+        market_index = "SPY"  # Default for US markets
+        market_index_name = "S&P 500"
+        
+        # Map universe to appropriate market index
+        universe_lower = request.universe.lower()
+        if universe_lower in ["set", "set50", "set100"]:
+            market_index = "^SET.BK"
+            market_index_name = "SET Index"
+        elif universe_lower == "nasdaq100":
+            market_index = "QQQ"
+            market_index_name = "NASDAQ 100"
+        elif universe_lower == "dji":
+            market_index = "DIA"
+            market_index_name = "Dow Jones"
+        
         try:
-            index_data = fetcher.get_price_data("SPY", period="2y")
+            index_data = fetcher.get_price_data(market_index, period="2y")
             if index_data is not None and len(index_data) >= 252:
                 detector = get_regime_detector()
                 regime = detector.detect_regime(index_data)
                 market_regime = detector.to_dict(regime)
+                market_regime['index_used'] = market_index_name
         except Exception as e:
             logger.warning(f"Could not get market regime: {e}")
         
@@ -555,7 +571,10 @@ async def export_enhanced_pdf(request: EnhancedPDFRequest):
         model = model_class()
         result = model.run(price_data, fundamental_data)
         
-        # Build enhanced context for each signal
+        # Get actual buy and sell signals from model result (matching dashboard behavior)
+        buy_signal_objs = result.get_buy_signals(request.top_n)
+        sell_signal_objs = result.get_sell_signals(request.top_n)
+        
         buy_signals = []
         sell_signals = []
         
@@ -568,59 +587,73 @@ async def export_enhanced_pdf(request: EnhancedPDFRequest):
                 context_builder.set_market_regime(market_regime)
             context_builder.set_model_results(request.model_id, result)
             
-            for ranking in result.rankings[:request.top_n]:
-                signal_type = ranking.get('signal', 'HOLD')
-                if signal_type == 'HOLD':
-                    continue
-                
+            # Process buy signals
+            for signal_obj in buy_signal_objs:
                 try:
                     enhanced = context_builder.build_enhanced_signal(
-                        ticker=ranking['ticker'],
-                        signal_type=signal_type,
-                        score=ranking.get('score', 50),
+                        ticker=signal_obj.ticker,
+                        signal_type='BUY',
+                        score=signal_obj.score,
                         model_id=request.model_id,
                         all_scores=[r.get('score', 50) for r in result.rankings]
                     )
                     
-                    signal_data = {
-                        'ticker': ranking['ticker'],
-                        'score': ranking.get('score', 0),
-                        'price_at_signal': ranking.get('price', 0),
+                    buy_signals.append({
+                        'ticker': signal_obj.ticker,
+                        'score': signal_obj.score,
+                        'price_at_signal': signal_obj.price_at_signal,
                         'enhanced_context': enhanced.to_dict() if enhanced else {}
-                    }
-                    
-                    if signal_type == 'BUY':
-                        buy_signals.append(signal_data)
-                    else:
-                        sell_signals.append(signal_data)
+                    })
                 except Exception as e:
-                    logger.warning(f"Failed to build context for {ranking['ticker']}: {e}")
-                    signal_data = {
-                        'ticker': ranking['ticker'],
-                        'score': ranking.get('score', 0),
-                        'price_at_signal': ranking.get('price', 0),
+                    logger.warning(f"Failed to build context for {signal_obj.ticker}: {e}")
+                    buy_signals.append({
+                        'ticker': signal_obj.ticker,
+                        'score': signal_obj.score,
+                        'price_at_signal': signal_obj.price_at_signal,
                         'enhanced_context': {}
-                    }
-                    if signal_type == 'BUY':
-                        buy_signals.append(signal_data)
-                    else:
-                        sell_signals.append(signal_data)
+                    })
+            
+            # Process sell signals
+            for signal_obj in sell_signal_objs:
+                try:
+                    enhanced = context_builder.build_enhanced_signal(
+                        ticker=signal_obj.ticker,
+                        signal_type='SELL',
+                        score=signal_obj.score,
+                        model_id=request.model_id,
+                        all_scores=[r.get('score', 50) for r in result.rankings]
+                    )
+                    
+                    sell_signals.append({
+                        'ticker': signal_obj.ticker,
+                        'score': signal_obj.score,
+                        'price_at_signal': signal_obj.price_at_signal,
+                        'enhanced_context': enhanced.to_dict() if enhanced else {}
+                    })
+                except Exception as e:
+                    logger.warning(f"Failed to build context for {signal_obj.ticker}: {e}")
+                    sell_signals.append({
+                        'ticker': signal_obj.ticker,
+                        'score': signal_obj.score,
+                        'price_at_signal': signal_obj.price_at_signal,
+                        'enhanced_context': {}
+                    })
         else:
-            # Without context
-            for ranking in result.rankings[:request.top_n]:
-                signal_type = ranking.get('signal', 'HOLD')
-                if signal_type == 'HOLD':
-                    continue
-                signal_data = {
-                    'ticker': ranking['ticker'],
-                    'score': ranking.get('score', 0),
-                    'price_at_signal': ranking.get('price', 0),
+            # Without context - use signal objects directly
+            for signal_obj in buy_signal_objs:
+                buy_signals.append({
+                    'ticker': signal_obj.ticker,
+                    'score': signal_obj.score,
+                    'price_at_signal': signal_obj.price_at_signal,
                     'enhanced_context': {}
-                }
-                if signal_type == 'BUY':
-                    buy_signals.append(signal_data)
-                else:
-                    sell_signals.append(signal_data)
+                })
+            for signal_obj in sell_signal_objs:
+                sell_signals.append({
+                    'ticker': signal_obj.ticker,
+                    'score': signal_obj.score,
+                    'price_at_signal': signal_obj.price_at_signal,
+                    'enhanced_context': {}
+                })
         
         # Generate PDF
         pdf_generator = get_pdf_generator()

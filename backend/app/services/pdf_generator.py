@@ -918,7 +918,8 @@ class PDFReportGenerator:
         
         # Market Regime Section (if available)
         if market_regime:
-            story.append(Paragraph("Market Regime", self.styles['SectionHeader']))
+            index_name = market_regime.get('index_used', 'Market')
+            story.append(Paragraph(f"Market Regime ({index_name})", self.styles['SectionHeader']))
             regime = market_regime.get('regime', 'UNKNOWN')
             regime_color = self.colors['success'] if regime == 'BULL' else self.colors['destructive'] if regime == 'BEAR' else colors.HexColor('#f59e0b')
             
