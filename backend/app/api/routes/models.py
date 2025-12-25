@@ -286,23 +286,45 @@ async def export_run_pdf(run_id: str, limit: int = Query(15, description="Number
         if not record:
             raise HTTPException(status_code=404, detail=f"Run not found: {run_id}")
         
+        # Handle both dict and object record formats
+        if isinstance(record, dict):
+            model_id = record.get('model_id', '')
+            model_name = record.get('model_name', 'Unknown Model')
+            category = record.get('category', 'Unknown')
+            universe = record.get('universe', 'unknown')
+            buy_signals = record.get('buy_signals', [])
+            sell_signals = record.get('sell_signals', [])
+            total_analyzed = record.get('total_analyzed', 0)
+            parameters = record.get('parameters', {})
+            run_timestamp = record.get('run_timestamp', '')
+        else:
+            model_id = record.model_id
+            model_name = record.model_name
+            category = record.category
+            universe = record.universe
+            buy_signals = record.buy_signals
+            sell_signals = record.sell_signals
+            total_analyzed = record.total_analyzed
+            parameters = record.parameters
+            run_timestamp = record.run_timestamp
+        
         # Get model documentation for description
-        doc = get_model_documentation(record.model_id)
+        doc = get_model_documentation(model_id)
         description = doc.get("summary", "") if doc else ""
         
         # Generate PDF
         pdf_generator = get_pdf_generator()
         try:
             pdf_bytes = pdf_generator.generate_model_report(
-                model_name=record.model_name,
-                category=record.category,
-                universe=record.universe,
-                buy_signals=record.buy_signals,
-                sell_signals=record.sell_signals,
-                total_analyzed=record.total_analyzed,
-                parameters=record.parameters,
+                model_name=model_name,
+                category=category,
+                universe=universe,
+                buy_signals=buy_signals,
+                sell_signals=sell_signals,
+                total_analyzed=total_analyzed,
+                parameters=parameters,
                 description=description,
-                run_timestamp=record.run_timestamp,
+                run_timestamp=run_timestamp,
                 limit=limit
             )
         except Exception as e:
@@ -315,23 +337,23 @@ async def export_run_pdf(run_id: str, limit: int = Query(15, description="Number
         # Generate readable filename: ModelName_Universe_YYYY-MM-DD_HHMMSS.pdf
         # Parse timestamp to get date and time
         try:
-            if 'T' in record.run_timestamp:
-                dt = datetime.fromisoformat(record.run_timestamp.replace('Z', '+00:00'))
+            if 'T' in run_timestamp:
+                dt = datetime.fromisoformat(run_timestamp.replace('Z', '+00:00'))
                 date_str = dt.strftime('%Y-%m-%d_%H%M%S')
             else:
                 # Try to parse timestamp and add time component
-                dt = datetime.fromisoformat(record.run_timestamp) if len(record.run_timestamp) >= 10 else datetime.now()
+                dt = datetime.fromisoformat(run_timestamp) if len(run_timestamp) >= 10 else datetime.now()
                 date_str = dt.strftime('%Y-%m-%d_%H%M%S')
         except (ValueError, AttributeError):
             # Fallback to current time with timestamp
             date_str = datetime.now().strftime('%Y-%m-%d_%H%M%S')
         
         # Clean model name for filename (remove special chars, spaces)
-        safe_model_name = "".join(c if c.isalnum() or c in (' ', '-', '_') else '' for c in record.model_name)
+        safe_model_name = "".join(c if c.isalnum() or c in (' ', '-', '_') else '' for c in model_name)
         safe_model_name = safe_model_name.replace(' ', '_')
         
         # Clean universe name
-        safe_universe = record.universe.upper().replace(' ', '_')
+        safe_universe = universe.upper().replace(' ', '_')
         
         # Create filename: ModelName_Universe_YYYY-MM-DD_HHMMSS.pdf
         filename = f"{safe_model_name}_{safe_universe}_{date_str}.pdf"

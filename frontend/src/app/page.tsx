@@ -242,17 +242,17 @@ const UniverseSelector = ({
       {isOpen && (
         <div style={{
           position: 'absolute',
-          bottom: '100%',
+          top: '100%',
           left: 0,
           width: '300px',
           maxHeight: '400px',
           overflowY: 'auto',
           background: 'var(--card)',
           color: 'var(--card-foreground)',
-          border: '1px solid var(--border)',
-          borderRadius: 'var(--radius)',
-          boxShadow: 'var(--shadow-sm)',
-          marginBottom: '5px',
+          border: '3px solid var(--border)',
+          borderRadius: '0',
+          boxShadow: '4px 4px 0 var(--border)',
+          marginTop: '5px',
           zIndex: 50,
           padding: '8px',
           display: 'flex',
@@ -1750,8 +1750,27 @@ export default function Home() {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             {!sidebarCollapsed && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <img src="/quant-logo.png" alt="Quant" style={{ height: '36px', width: 'auto' }} />
-                <span style={{ fontSize: '10px', padding: '2px 6px', background: 'var(--primary)', color: '#fff', fontWeight: '700', border: '2px solid var(--border)', transform: 'rotate(-2deg)' }}>v2.0.2</span>
+                <span style={{
+                  fontSize: '1.4rem',
+                  fontWeight: '900',
+                  fontFamily: 'var(--font-sans)',
+                  letterSpacing: '-1px',
+                  color: 'var(--foreground)',
+                  textTransform: 'uppercase' as const,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}>
+                  <span style={{
+                    background: 'var(--primary)',
+                    color: '#fff',
+                    padding: '4px 8px',
+                    border: '3px solid var(--border)',
+                    boxShadow: '3px 3px 0 var(--border)'
+                  }}>Q</span>
+                  <span>UANT</span>
+                </span>
+                <span style={{ fontSize: '9px', padding: '2px 6px', background: 'var(--primary)', color: '#fff', fontWeight: '700', border: '2px solid var(--border)', transform: 'rotate(-2deg)' }}>v2.0.2</span>
               </div>
             )}
             {sidebarCollapsed && <span style={{ fontSize: '1.2rem' }}>📈</span>}
