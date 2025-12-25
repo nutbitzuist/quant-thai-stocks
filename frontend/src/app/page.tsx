@@ -474,9 +474,9 @@ const StockAnalyzer = () => {
                 </div>
                 <button
                   onClick={downloadPdf}
-                  style={{ marginTop: '10px', background: 'var(--primary)', color: 'var(--primary-foreground)', border: 'none', padding: '8px 16px', borderRadius: 'var(--radius)', cursor: 'pointer', fontSize: '0.9rem' }}
+                  style={{ ...S.btn('primary'), marginTop: '10px' }}
                 >
-                  ⬇️ Download PDF Report
+                  ⬇️ DOWNLOAD PDF
                 </button>
               </div>
             </div>
@@ -1745,16 +1745,38 @@ export default function Home() {
         overflowY: 'auto',
         fontFamily: 'var(--font-sans)'
       }}>
-        {/* Sidebar Header */}
-        <div style={{ padding: '1rem', borderBottom: '3px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          {!sidebarCollapsed && <span style={{ fontWeight: '800', fontSize: '1rem', fontFamily: 'var(--font-sans)', letterSpacing: '-0.5px' }}>📈 QUANT v2.0.2</span>}
-          <button
-            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            style={{ background: 'var(--card)', border: '2px solid var(--border)', cursor: 'pointer', padding: '6px 8px', fontSize: '1rem', color: 'var(--foreground)', fontWeight: '700', boxShadow: '2px 2px 0 var(--border)' }}
-            title={sidebarCollapsed ? 'Expand' : 'Collapse'}
-          >
-            {sidebarCollapsed ? '→' : '←'}
-          </button>
+        {/* Sidebar Header with Logo */}
+        <div style={{ padding: '1rem', borderBottom: '3px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            {!sidebarCollapsed && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <img src="/quant-logo.png" alt="Quant" style={{ height: '36px', width: 'auto' }} />
+                <span style={{ fontSize: '10px', padding: '2px 6px', background: 'var(--primary)', color: '#fff', fontWeight: '700', border: '2px solid var(--border)', transform: 'rotate(-2deg)' }}>v2.0.2</span>
+              </div>
+            )}
+            {sidebarCollapsed && <span style={{ fontSize: '1.2rem' }}>📈</span>}
+            <button
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              style={{ background: 'var(--card)', border: '2px solid var(--border)', cursor: 'pointer', padding: '6px 8px', fontSize: '1rem', color: 'var(--foreground)', fontWeight: '700', boxShadow: '2px 2px 0 var(--border)' }}
+              title={sidebarCollapsed ? 'Expand' : 'Collapse'}
+            >
+              {sidebarCollapsed ? '→' : '←'}
+            </button>
+          </div>
+
+          {/* Universe Selector - moved below logo */}
+          {!sidebarCollapsed && (
+            <div>
+              <label style={{ fontSize: '0.7rem', fontWeight: '700', color: 'var(--muted-foreground)', display: 'block', marginBottom: '4px', textTransform: 'uppercase' as const, letterSpacing: '0.5px', fontFamily: 'var(--font-sans)' }}>UNIVERSE</label>
+              <UniverseSelector
+                current={universe}
+                universes={universes}
+                customUniverses={customUniverses}
+                onChange={setUniverse}
+                sidebarCollapsed={sidebarCollapsed}
+              />
+            </div>
+          )}
         </div>
 
         {/* Connection Status */}
@@ -1855,20 +1877,7 @@ export default function Home() {
               )}
             </div>
           ))}
-        </div>
-
-        {/* Universe Selector at bottom */}
-        <div style={{ padding: sidebarCollapsed ? '0.5rem' : '1rem', borderTop: '3px solid var(--border)' }}>
-          {!sidebarCollapsed && <label style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--muted-foreground)', display: 'block', marginBottom: '6px', textTransform: 'uppercase' as const, letterSpacing: '0.5px', fontFamily: 'var(--font-sans)' }}>Universe</label>}
-          <UniverseSelector
-            current={universe}
-            universes={universes}
-            customUniverses={customUniverses}
-            onChange={setUniverse}
-            sidebarCollapsed={sidebarCollapsed}
-          />
-        </div>
-      </div>
+        </div>\n      </div>
 
       {/* Main Content */}
       <div style={{ flex: 1, overflowY: 'auto', height: '100vh' }}>
