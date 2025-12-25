@@ -8,7 +8,7 @@ API Documentation: https://www.setsmart.com (login required)
 import pandas as pd
 import requests
 from datetime import datetime, timedelta
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 import logging
 import time
 
