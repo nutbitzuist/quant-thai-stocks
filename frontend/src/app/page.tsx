@@ -87,82 +87,94 @@ const cleanMarkdown = (text: string): string => {
   return text.replace(/\*\*/g, '').replace(/\*/g, '').trim();
 };
 
+// Neo-Brutalist Style Object - HQ0 inspired
 const S = {
   card: {
     background: 'var(--card)',
     color: 'var(--card-foreground)',
-    borderRadius: 'var(--radius)',
+    borderRadius: '0',
     padding: '1.25rem',
     marginBottom: '1rem',
-    boxShadow: 'var(--shadow-sm)',
-    border: '1px solid var(--border)'
+    boxShadow: '4px 4px 0 var(--border)',
+    border: '3px solid var(--border)',
+    transition: 'transform 0.1s ease, box-shadow 0.1s ease'
   } as React.CSSProperties,
   btn: (v: string) => ({
-    padding: '0.5rem 1rem',
-    background: v === 'primary' ? 'var(--primary)' : v === 'success' ? '#22c55e' : v === 'danger' ? 'var(--destructive)' : 'var(--secondary)',
-    color: v === 'primary' || v === 'success' || v === 'danger' ? 'var(--primary-foreground)' : 'var(--secondary-foreground)',
-    border: 'none',
-    borderRadius: 'var(--radius)',
+    padding: '0.625rem 1.25rem',
+    background: v === 'primary' ? 'var(--primary)' : v === 'success' ? '#22c55e' : v === 'danger' ? 'var(--destructive)' : 'var(--card)',
+    color: v === 'primary' || v === 'success' || v === 'danger' ? '#ffffff' : 'var(--foreground)',
+    border: '3px solid var(--border)',
+    borderRadius: '0',
     cursor: 'pointer',
     marginRight: '0.5rem',
     fontSize: '0.875rem',
-    fontWeight: '500',
-    transition: 'all 0.2s ease',
-    boxShadow: 'var(--shadow-xs)'
+    fontWeight: '700',
+    transition: 'transform 0.1s ease, box-shadow 0.1s ease',
+    boxShadow: '3px 3px 0 var(--border)',
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.5px'
   } as React.CSSProperties & { onMouseEnter?: (e: React.MouseEvent<HTMLButtonElement>) => void; onMouseLeave?: (e: React.MouseEvent<HTMLButtonElement>) => void }),
   select: {
-    padding: '0.5rem 0.75rem',
-    borderRadius: 'var(--radius)',
-    border: '1px solid var(--input)',
+    padding: '0.625rem 0.875rem',
+    borderRadius: '0',
+    border: '3px solid var(--border)',
     marginRight: '0.625rem',
     fontSize: '0.875rem',
-    background: 'var(--background)',
-    color: 'var(--foreground)'
+    fontWeight: '600',
+    background: 'var(--card)',
+    color: 'var(--foreground)',
+    boxShadow: '3px 3px 0 var(--border)',
+    cursor: 'pointer'
   } as React.CSSProperties,
   tab: (a: boolean) => ({
-    padding: '0.5rem 1rem',
-    background: a ? 'var(--primary)' : 'transparent',
-    color: a ? 'var(--primary-foreground)' : 'var(--muted-foreground)',
-    border: 'none',
-    borderRadius: 'var(--radius)',
+    padding: '0.625rem 1.25rem',
+    background: a ? 'var(--primary)' : 'var(--card)',
+    color: a ? '#ffffff' : 'var(--foreground)',
+    border: '3px solid var(--border)',
+    borderRadius: '0',
     cursor: 'pointer',
-    fontWeight: a ? '600' : 'normal' as const,
+    fontWeight: '700',
     fontSize: '0.875rem',
-    transition: 'all 0.2s ease',
-    ...(a ? {} : { ':hover': { background: 'var(--muted)' } })
+    transition: 'transform 0.1s ease, box-shadow 0.1s ease',
+    boxShadow: a ? '4px 4px 0 var(--border)' : '3px 3px 0 var(--border)',
+    textTransform: 'uppercase' as const
   } as React.CSSProperties),
   dot: (ok: boolean) => ({
-    width: '10px',
-    height: '10px',
-    borderRadius: '50%',
+    width: '12px',
+    height: '12px',
+    borderRadius: '0',
     background: ok ? '#22c55e' : 'var(--destructive)',
     display: 'inline-block',
     marginRight: '0.5rem',
-    boxShadow: 'var(--shadow-xs)'
+    border: '2px solid var(--border)'
   } as React.CSSProperties),
   input: {
-    padding: '0.5rem 0.75rem',
-    borderRadius: 'var(--radius)',
-    border: '1px solid var(--input)',
+    padding: '0.625rem 0.875rem',
+    borderRadius: '0',
+    border: '3px solid var(--border)',
     width: '100%',
     marginBottom: '0.625rem',
     fontSize: '0.875rem',
-    background: 'var(--background)',
+    fontWeight: '500',
+    background: 'var(--card)',
     color: 'var(--foreground)',
-    transition: 'border-color 0.2s ease'
+    transition: 'box-shadow 0.1s ease',
+    boxShadow: '2px 2px 0 var(--border)'
   } as React.CSSProperties,
   textarea: {
-    padding: '0.5rem 0.75rem',
-    borderRadius: 'var(--radius)',
-    border: '1px solid var(--input)',
+    padding: '0.625rem 0.875rem',
+    borderRadius: '0',
+    border: '3px solid var(--border)',
     width: '100%',
     minHeight: '100px',
     marginBottom: '0.625rem',
     fontSize: '0.875rem',
+    fontWeight: '500',
     fontFamily: 'var(--font-mono)',
-    background: 'var(--background)',
+    background: 'var(--card)',
     color: 'var(--foreground)',
-    transition: 'border-color 0.2s ease'
+    transition: 'box-shadow 0.1s ease',
+    boxShadow: '2px 2px 0 var(--border)'
   } as React.CSSProperties,
 };
 
