@@ -1,7 +1,9 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { Model, ModelResult, Log, API_URL } from '@/types/dashboard';
+import { Model, ModelResult, API_URL } from '@/types/dashboard';
+import { fetchAPI } from '@/lib/api';
+import { toast } from 'sonner';
 
 interface UseModelsReturn {
     models: Model[];
@@ -30,20 +32,12 @@ export function useModels(onLog?: (type: 'info' | 'error' | 'success', message: 
         setLoading(true);
         setError(null);
         try {
-            const response = await fetch(`${API_URL}/api/models/`);
-            if (response.ok) {
-                const data = await response.json();
-                setModels(data);
-                log('success', `Loaded ${data.length} models`);
-            } else {
-                const errorData = await response.json();
-                setError(errorData.detail || 'Failed to load models');
-                log('error', errorData.detail || 'Failed to load models');
-            }
-        } catch (err) {
-            const message = err instanceof Error ? err.message : 'Connection error';
-            setError(message);
-            log('error', message);
+            const data = await fetchAPI<Model[]>(`${API_URL}/api/models/`);
+            setModels(data);
+            log('success', `Loaded ${data.length} models`);
+        } catch (err: any) {
+            setError(err.message);
+            log('error', err.message);
         }
         setLoading(false);
     }, [log]);
@@ -51,24 +45,21 @@ export function useModels(onLog?: (type: 'info' | 'error' | 'success', message: 
     const runModel = useCallback(async (id: string, universe: string, topN: number) => {
         setRunning(id);
         log('info', `Running ${id}...`);
+        const toastId = toast.loading(`Running model ${id}...`);
 
         try {
-            const response = await fetch(`${API_URL}/api/models/run`, {
+            const data = await fetchAPI<ModelResult>(`${API_URL}/api/models/run`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ model_id: id, universe, top_n: topN })
             });
 
-            if (response.ok) {
-                const data = await response.json();
-                setResults(prev => ({ ...prev, [id]: data }));
-                log('success', `${data.model_name}: ${data.buy_signals.length} buy, ${data.sell_signals.length} sell`);
-            } else {
-                const errorData = await response.json();
-                log('error', errorData.detail);
-            }
-        } catch (err) {
-            log('error', `${err}`);
+            setResults(prev => ({ ...prev, [id]: data }));
+            log('success', `${data.model_name}: ${data.buy_signals.length} buy, ${data.sell_signals.length} sell`);
+            toast.success(`Model ${data.model_name} completed`, { id: toastId });
+        } catch (err: any) {
+            log('error', `${err.message}`);
+            toast.error(err.message, { id: toastId });
         }
 
         setRunning(null);
@@ -82,24 +73,21 @@ export function useModels(onLog?: (type: 'info' | 'error' | 'success', message: 
     ) => {
         setRunning(id);
         log('info', `Running ${id} with custom parameters...`);
+        const toastId = toast.loading(`Running model ${id}...`);
 
         try {
-            const response = await fetch(`${API_URL}/api/models/run`, {
+            const data = await fetchAPI<ModelResult>(`${API_URL}/api/models/run`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ model_id: id, universe, top_n: topN, parameters: params })
             });
 
-            if (response.ok) {
-                const data = await response.json();
-                setResults(prev => ({ ...prev, [id]: data }));
-                log('success', `${data.model_name}: ${data.buy_signals.length} buy, ${data.sell_signals.length} sell (custom params)`);
-            } else {
-                const errorData = await response.json();
-                log('error', errorData.detail);
-            }
-        } catch (err) {
-            log('error', `${err}`);
+            setResults(prev => ({ ...prev, [id]: data }));
+            log('success', `${data.model_name}: ${data.buy_signals.length} buy, ${data.sell_signals.length} sell (custom params)`);
+            toast.success(`Model ${data.model_name} completed`, { id: toastId });
+        } catch (err: any) {
+            log('error', `${err.message}`);
+            toast.error(err.message, { id: toastId });
         }
 
         setRunning(null);

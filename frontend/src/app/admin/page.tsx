@@ -1,10 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useUser } from '@clerk/nextjs';
 import Link from 'next/link';
 
 // Admin emails (can be moved to env var later)
-const ADMIN_EMAILS = ['email.nutty@gmail.com'];
+const ADMIN_EMAILS = [
+    'email.nutty@gmail.com',
+    ...(process.env.NEXT_PUBLIC_ADMIN_EMAILS || '').split(',').map(e => e.trim()).filter(Boolean)
+];
 
 // Mock data for users
 const MOCK_USERS = [
@@ -42,67 +46,38 @@ const MODEL_STATS = [
 
 export default function AdminPage() {
     const [activeTab, setActiveTab] = useState<'users' | 'usage' | 'analytics'>('users');
-    const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
-    const [userEmail, setUserEmail] = useState<string>('');
+    const { user, isLoaded } = useUser();
+    const [isAdmin, setIsAdmin] = useState<boolean>(false);
 
-    // Check admin status - in production, use Clerk's useUser hook
     useEffect(() => {
-        // For demo purposes, auto-login as admin
-        // In production, check against Clerk user email
-        const checkAdmin = async () => {
-            try {
-                // Try to get user from Clerk
-                const clerk = await import('@clerk/nextjs');
-                // For now, assume admin access for demo
+        if (isLoaded && user) {
+            const email = user.primaryEmailAddress?.emailAddress;
+            if (email && ADMIN_EMAILS.includes(email)) {
                 setIsAdmin(true);
-                setUserEmail('email.nutty@gmail.com');
-            } catch {
-                // Clerk not configured, allow admin access for demo
-                setIsAdmin(true);
-                setUserEmail('email.nutty@gmail.com');
+            } else {
+                setIsAdmin(false);
             }
-        };
-        checkAdmin();
-    }, []);
+        }
+    }, [isLoaded, user]);
 
-    if (isAdmin === null) {
+    if (!isLoaded) {
         return (
-            <div style={{
-                minHeight: '100vh',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                background: 'var(--background)',
-            }}>
-                <div style={{ fontSize: '1.5rem', fontWeight: '700' }}>Loading...</div>
+            <div className="flex min-h-screen items-center justify-center bg-gray-50">
+                <div className="text-xl font-semibold">Loading...</div>
             </div>
         );
     }
 
     if (!isAdmin) {
         return (
-            <div style={{
-                minHeight: '100vh',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                background: 'var(--background)',
-                gap: '1rem',
-            }}>
-                <div style={{ fontSize: '4rem' }}>🚫</div>
-                <h1 style={{ fontSize: '2rem', fontWeight: '900' }}>Access Denied</h1>
-                <p style={{ color: 'var(--muted-foreground)' }}>You don't have admin privileges.</p>
-                <Link href="/" style={{
-                    padding: '0.75rem 1.5rem',
-                    background: 'var(--primary)',
-                    color: 'var(--primary-foreground)',
-                    border: '3px solid var(--border)',
-                    boxShadow: '4px 4px 0 var(--border)',
-                    textDecoration: 'none',
-                    fontWeight: '700',
-                }}>
-                    Return Home
+            <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50 p-4 text-center">
+                <h1 className="mb-4 text-3xl font-bold text-red-600">Access Denied</h1>
+                <p className="mb-6 text-xl text-gray-700">You do not have permission to view the admin dashboard.</p>
+                <div className="text-sm text-gray-500 mb-8">
+                    User: {user?.primaryEmailAddress?.emailAddress || 'Not signed in'}
+                </div>
+                <Link href="/" className="rounded-md bg-blue-600 px-6 py-2 text-white hover:bg-blue-700">
+                    Return to Home
                 </Link>
             </div>
         );
@@ -111,349 +86,225 @@ export default function AdminPage() {
     return (
         <div style={{
             minHeight: '100vh',
-            background: 'var(--background)',
-            padding: '2rem',
+            background: '#f9fafb',
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
         }}>
-            <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
-                {/* Header */}
-                <div style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    marginBottom: '2rem',
-                    paddingBottom: '1rem',
-                    borderBottom: '3px solid var(--border)',
-                }}>
-                    <div>
-                        <h1 style={{ fontSize: '2rem', fontWeight: '900', marginBottom: '0.25rem' }}>
-                            🔐 Admin Dashboard
-                        </h1>
-                        <p style={{ color: 'var(--muted-foreground)', fontSize: '0.9rem' }}>
-                            Logged in as: {userEmail}
-                        </p>
+            {/* Admin Header */}
+            <div style={{ background: '#1f2937', color: 'white', padding: '1rem 2rem' }}>
+                <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                        <h1 style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>QuantStack Admin</h1>
+                        <span style={{
+                            background: '#374151',
+                            padding: '0.25rem 0.75rem',
+                            borderRadius: '9999px',
+                            fontSize: '0.75rem'
+                        }}>
+                            v2.0.2
+                        </span>
                     </div>
-                    <Link href="/" style={{
-                        padding: '0.5rem 1rem',
-                        background: 'var(--card)',
-                        border: '2px solid var(--border)',
-                        boxShadow: '3px 3px 0 var(--border)',
-                        textDecoration: 'none',
-                        color: 'var(--foreground)',
-                        fontWeight: '600',
-                        fontSize: '0.9rem',
-                    }}>
-                        ← Back to Site
-                    </Link>
-                </div>
-
-                {/* Stats Overview */}
-                <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                    gap: '1rem',
-                    marginBottom: '2rem',
-                }}>
-                    <StatCard icon="👥" label="Total Users" value={MOCK_USERS.length.toString()} />
-                    <StatCard icon="✅" label="Active Users" value={MOCK_USERS.filter(u => u.status === 'Active').length.toString()} />
-                    <StatCard icon="📊" label="Total Scans Today" value="1,350" />
-                    <StatCard icon="💰" label="MRR" value="$2,847" />
-                </div>
-
-                {/* Tab Navigation */}
-                <div style={{
-                    display: 'flex',
-                    gap: '0.5rem',
-                    marginBottom: '1.5rem',
-                }}>
-                    {(['users', 'usage', 'analytics'] as const).map(tab => (
-                        <button
-                            key={tab}
-                            onClick={() => setActiveTab(tab)}
-                            style={{
-                                padding: '0.75rem 1.5rem',
-                                background: activeTab === tab ? 'var(--primary)' : 'var(--card)',
-                                color: activeTab === tab ? 'var(--primary-foreground)' : 'var(--foreground)',
-                                border: '3px solid var(--border)',
-                                boxShadow: activeTab === tab ? '4px 4px 0 var(--border)' : '2px 2px 0 var(--border)',
-                                fontWeight: '700',
-                                cursor: 'pointer',
-                                textTransform: 'capitalize',
-                            }}
-                        >
-                            {tab === 'users' && '👥 '}
-                            {tab === 'usage' && '📋 '}
-                            {tab === 'analytics' && '📈 '}
-                            {tab}
-                        </button>
-                    ))}
-                </div>
-
-                {/* Tab Content */}
-                <div style={{
-                    background: 'var(--card)',
-                    border: '3px solid var(--border)',
-                    boxShadow: '5px 5px 0 var(--border)',
-                    padding: '1.5rem',
-                }}>
-                    {activeTab === 'users' && <UsersTable users={MOCK_USERS} />}
-                    {activeTab === 'usage' && <UsageLogs logs={MOCK_USAGE_LOGS} />}
-                    {activeTab === 'analytics' && <Analytics stats={MODEL_STATS} />}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                        <div style={{ fontSize: '0.875rem', color: '#9ca3af' }}>
+                            {user?.primaryEmailAddress?.emailAddress}
+                        </div>
+                        <Link href="/" style={{ fontSize: '0.875rem', color: '#e5e7eb', textDecoration: 'none' }}>
+                            Back to App
+                        </Link>
+                    </div>
                 </div>
             </div>
-        </div>
-    );
-}
 
-function StatCard({ icon, label, value }: { icon: string; label: string; value: string }) {
-    return (
-        <div style={{
-            padding: '1.25rem',
-            background: 'var(--card)',
-            border: '3px solid var(--border)',
-            boxShadow: '4px 4px 0 var(--border)',
-        }}>
-            <div style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>{icon}</div>
-            <div style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)', marginBottom: '0.25rem' }}>{label}</div>
-            <div style={{ fontSize: '1.75rem', fontWeight: '900' }}>{value}</div>
-        </div>
-    );
-}
+            {/* Dashboard Content */}
+            <div style={{ maxWidth: '1200px', margin: '2rem auto', padding: '0 2rem' }}>
+                {/* Stats Cards */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.5rem', marginBottom: '2rem' }}>
+                    <StatsCard title="Total Users" value="1,248" change="+12% this month" color="blue" />
+                    <StatsCard title="Active Scans Today" value="452" change="+5% from yesterday" color="green" />
+                    <StatsCard title="API Error Rate" value="0.8%" change="-0.2% improvement" color="indigo" />
+                    <StatsCard title="Revenue (MRR)" value="$3,850" change="+8% this month" color="purple" />
+                </div>
 
-function UsersTable({ users }: { users: typeof MOCK_USERS }) {
-    return (
-        <div>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: '800', marginBottom: '1rem' }}>
-                User Management
-            </h2>
-            <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                    <thead>
-                        <tr style={{ borderBottom: '3px solid var(--border)' }}>
-                            <th style={thStyle}>Email</th>
-                            <th style={thStyle}>Plan</th>
-                            <th style={thStyle}>Billing</th>
-                            <th style={thStyle}>Status</th>
-                            <th style={thStyle}>Scans Used</th>
-                            <th style={thStyle}>Joined</th>
-                            <th style={thStyle}>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {users.map(user => (
-                            <tr key={user.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                                <td style={tdStyle}>
-                                    <strong>{user.email}</strong>
-                                </td>
-                                <td style={tdStyle}>
-                                    <span style={{
-                                        padding: '0.25rem 0.5rem',
-                                        background: user.plan === 'Unlimited' ? 'var(--primary)' : 'var(--muted)',
-                                        color: user.plan === 'Unlimited' ? 'var(--primary-foreground)' : 'var(--foreground)',
-                                        fontWeight: '600',
-                                        fontSize: '0.8rem',
-                                        border: '2px solid var(--border)',
-                                    }}>
-                                        {user.plan}
-                                    </span>
-                                </td>
-                                <td style={tdStyle}>{user.billing}</td>
-                                <td style={tdStyle}>
-                                    <span style={{
-                                        padding: '0.25rem 0.5rem',
-                                        background: user.status === 'Active' ? 'var(--success)' : 'var(--muted)',
-                                        color: user.status === 'Active' ? 'white' : 'var(--muted-foreground)',
-                                        fontWeight: '600',
-                                        fontSize: '0.8rem',
-                                        border: '2px solid var(--border)',
-                                    }}>
-                                        {user.status}
-                                    </span>
-                                </td>
-                                <td style={tdStyle}>
-                                    {user.scansLimit ? (
-                                        <div>
-                                            <span style={{ fontWeight: '700' }}>{user.scansUsed}</span>
-                                            <span style={{ color: 'var(--muted-foreground)' }}> / {user.scansLimit}</span>
-                                            <div style={{
-                                                height: '6px',
-                                                background: 'var(--muted)',
-                                                marginTop: '4px',
-                                                border: '1px solid var(--border)',
-                                            }}>
+                {/* Main Content Area */}
+                <div style={{ background: 'white', borderRadius: '0.5rem', boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)', overflow: 'hidden' }}>
+
+                    {/* Tabs */}
+                    <div style={{ borderBottom: '1px solid #e5e7eb', display: 'flex' }}>
+                        <TabButton
+                            active={activeTab === 'users'}
+                            onClick={() => setActiveTab('users')}
+                            label="User Management"
+                        />
+                        <TabButton
+                            active={activeTab === 'usage'}
+                            onClick={() => setActiveTab('usage')}
+                            label="Recent Usage"
+                        />
+                        <TabButton
+                            active={activeTab === 'analytics'}
+                            onClick={() => setActiveTab('analytics')}
+                            label="Model Analytics"
+                        />
+                    </div>
+
+                    {/* Tab Content */}
+                    <div style={{ padding: '2rem' }}>
+                        {activeTab === 'users' && (
+                            <div>
+                                <h3 style={{ fontSize: '1.125rem', fontWeight: 'bold', marginBottom: '1.5rem' }}>Registered Users</h3>
+                                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                    <thead>
+                                        <tr style={{ textAlign: 'left', borderBottom: '2px solid #f3f4f6' }}>
+                                            <th style={{ padding: '0.75rem', fontSize: '0.875rem', color: '#6b7280' }}>Email</th>
+                                            <th style={{ padding: '0.75rem', fontSize: '0.875rem', color: '#6b7280' }}>Plan</th>
+                                            <th style={{ padding: '0.75rem', fontSize: '0.875rem', color: '#6b7280' }}>Status</th>
+                                            <th style={{ padding: '0.75rem', fontSize: '0.875rem', color: '#6b7280' }}>Scans Used</th>
+                                            <th style={{ padding: '0.75rem', fontSize: '0.875rem', color: '#6b7280' }}>Joined At</th>
+                                            <th style={{ padding: '0.75rem', fontSize: '0.875rem', color: '#6b7280' }}>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {MOCK_USERS.map((user) => (
+                                            <tr key={user.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                                                <td style={{ padding: '0.75rem' }}>
+                                                    <div>{user.email}</div>
+                                                    <div style={{ fontSize: '0.75rem', color: '#9ca3af' }}>ID: {user.id}</div>
+                                                </td>
+                                                <td style={{ padding: '0.75rem' }}>
+                                                    <span style={{
+                                                        background: user.plan === 'Unlimited' ? '#eef2ff' : '#f3f4f6',
+                                                        color: user.plan === 'Unlimited' ? '#4f46e5' : '#374151',
+                                                        padding: '0.25rem 0.5rem',
+                                                        borderRadius: '0.25rem',
+                                                        fontSize: '0.875rem'
+                                                    }}>
+                                                        {user.plan} ({user.billing})
+                                                    </span>
+                                                </td>
+                                                <td style={{ padding: '0.75rem' }}>
+                                                    <span style={{
+                                                        background: user.status === 'Active' ? '#ecfdf5' : '#fef2f2',
+                                                        color: user.status === 'Active' ? '#059669' : '#dc2626',
+                                                        padding: '0.25rem 0.5rem',
+                                                        borderRadius: '9999px',
+                                                        fontSize: '0.75rem'
+                                                    }}>
+                                                        {user.status}
+                                                    </span>
+                                                </td>
+                                                <td style={{ padding: '0.75rem', fontSize: '0.875rem' }}>
+                                                    {user.scansUsed} / {user.scansLimit || '∞'}
+                                                </td>
+                                                <td style={{ padding: '0.75rem', fontSize: '0.875rem', color: '#6b7280' }}>{user.joinedAt}</td>
+                                                <td style={{ padding: '0.75rem' }}>
+                                                    <button style={{ color: '#2563eb', fontSize: '0.875rem', marginRight: '1rem' }}>Edit</button>
+                                                    <button style={{ color: '#dc2626', fontSize: '0.875rem' }}>Ban</button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+
+                        {activeTab === 'usage' && (
+                            <div>
+                                <h3 style={{ fontSize: '1.125rem', fontWeight: 'bold', marginBottom: '1.5rem' }}>Recent Scan Activity</h3>
+                                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                    <thead>
+                                        <tr style={{ textAlign: 'left', borderBottom: '2px solid #f3f4f6' }}>
+                                            <th style={{ padding: '0.75rem', fontSize: '0.875rem', color: '#6b7280' }}>Timestamp</th>
+                                            <th style={{ padding: '0.75rem', fontSize: '0.875rem', color: '#6b7280' }}>User</th>
+                                            <th style={{ padding: '0.75rem', fontSize: '0.875rem', color: '#6b7280' }}>Model</th>
+                                            <th style={{ padding: '0.75rem', fontSize: '0.875rem', color: '#6b7280' }}>Market</th>
+                                            <th style={{ padding: '0.75rem', fontSize: '0.875rem', color: '#6b7280' }}>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {MOCK_USAGE_LOGS.map((log) => (
+                                            <tr key={log.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                                                <td style={{ padding: '0.75rem', fontSize: '0.875rem', color: '#6b7280' }}>{log.timestamp}</td>
+                                                <td style={{ padding: '0.75rem', fontSize: '0.875rem' }}>{log.userEmail}</td>
+                                                <td style={{ padding: '0.75rem', fontSize: '0.875rem' }}>{log.model}</td>
+                                                <td style={{ padding: '0.75rem', fontSize: '0.875rem' }}>{log.market}</td>
+                                                <td style={{ padding: '0.75rem' }}>
+                                                    <span style={{
+                                                        color: log.status === 'Success' ? '#059669' : '#dc2626',
+                                                        fontSize: '0.875rem'
+                                                    }}>
+                                                        {log.status}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+
+                        {activeTab === 'analytics' && (
+                            <div>
+                                <h3 style={{ fontSize: '1.125rem', fontWeight: 'bold', marginBottom: '1.5rem' }}>Popular Models</h3>
+                                <div style={{ display: 'grid', gap: '1rem' }}>
+                                    {MODEL_STATS.map((stat, idx) => (
+                                        <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                            <div style={{ width: '150px', fontSize: '0.875rem' }}>{stat.model}</div>
+                                            <div style={{ flex: 1, height: '24px', background: '#f3f4f6', borderRadius: '4px', overflow: 'hidden' }}>
                                                 <div style={{
+                                                    width: `${stat.percentage}%`,
                                                     height: '100%',
-                                                    width: `${(user.scansUsed / user.scansLimit) * 100}%`,
-                                                    background: user.scansUsed / user.scansLimit > 0.8 ? '#ef4444' : 'var(--success)',
+                                                    background: idx < 3 ? '#2563eb' : '#93c5fd',
+                                                    transition: 'width 0.5s ease'
                                                 }} />
                                             </div>
+                                            <div style={{ width: '100px', fontSize: '0.875rem', color: '#6b7280' }}>
+                                                {stat.count} runs ({stat.percentage}%)
+                                            </div>
                                         </div>
-                                    ) : (
-                                        <span style={{ color: 'var(--primary)', fontWeight: '700' }}>∞ {user.scansUsed}</span>
-                                    )}
-                                </td>
-                                <td style={tdStyle}>{user.joinedAt}</td>
-                                <td style={tdStyle}>
-                                    <button style={{
-                                        padding: '0.25rem 0.5rem',
-                                        background: 'var(--card)',
-                                        border: '2px solid var(--border)',
-                                        cursor: 'pointer',
-                                        fontSize: '0.8rem',
-                                    }}>
-                                        View
-                                    </button>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    );
-}
-
-function UsageLogs({ logs }: { logs: typeof MOCK_USAGE_LOGS }) {
-    return (
-        <div>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: '800', marginBottom: '1rem' }}>
-                Usage Logs
-            </h2>
-            <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                    <thead>
-                        <tr style={{ borderBottom: '3px solid var(--border)' }}>
-                            <th style={thStyle}>Timestamp</th>
-                            <th style={thStyle}>User</th>
-                            <th style={thStyle}>Model</th>
-                            <th style={thStyle}>Stocks</th>
-                            <th style={thStyle}>Market</th>
-                            <th style={thStyle}>Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {logs.map(log => (
-                            <tr key={log.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                                <td style={tdStyle}>
-                                    <span style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}>
-                                        {log.timestamp}
-                                    </span>
-                                </td>
-                                <td style={tdStyle}>{log.userEmail}</td>
-                                <td style={tdStyle}>
-                                    <strong>{log.model}</strong>
-                                </td>
-                                <td style={tdStyle}>{log.stocksScanned}</td>
-                                <td style={tdStyle}>
-                                    <span style={{
-                                        padding: '0.15rem 0.4rem',
-                                        background: log.market === 'US' ? '#3b82f6' : '#10b981',
-                                        color: 'white',
-                                        fontSize: '0.75rem',
-                                        fontWeight: '600',
-                                    }}>
-                                        {log.market}
-                                    </span>
-                                </td>
-                                <td style={tdStyle}>
-                                    <span style={{
-                                        padding: '0.15rem 0.4rem',
-                                        background: log.status === 'Success' ? 'var(--success)' : '#ef4444',
-                                        color: 'white',
-                                        fontSize: '0.75rem',
-                                        fontWeight: '600',
-                                    }}>
-                                        {log.status}
-                                    </span>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    );
-}
-
-function Analytics({ stats }: { stats: typeof MODEL_STATS }) {
-    const maxCount = Math.max(...stats.map(s => s.count));
-
-    return (
-        <div>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: '800', marginBottom: '1rem' }}>
-                Model Usage Analytics
-            </h2>
-            <p style={{ color: 'var(--muted-foreground)', marginBottom: '1.5rem' }}>
-                Top models by usage this month
-            </p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                {stats.map((stat, i) => (
-                    <div key={i}>
-                        <div style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            marginBottom: '0.25rem',
-                        }}>
-                            <span style={{ fontWeight: '600' }}>{stat.model}</span>
-                            <span style={{ color: 'var(--muted-foreground)' }}>
-                                {stat.count} scans ({stat.percentage}%)
-                            </span>
-                        </div>
-                        <div style={{
-                            height: '24px',
-                            background: 'var(--muted)',
-                            border: '2px solid var(--border)',
-                        }}>
-                            <div style={{
-                                height: '100%',
-                                width: `${(stat.count / maxCount) * 100}%`,
-                                background: i === 0 ? 'var(--primary)' : i < 3 ? 'var(--success)' : '#64748b',
-                                transition: 'width 0.5s ease',
-                            }} />
-                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                     </div>
-                ))}
-            </div>
-
-            {/* Summary Stats */}
-            <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-                gap: '1rem',
-                marginTop: '2rem',
-                padding: '1rem',
-                background: 'var(--muted)',
-                border: '2px solid var(--border)',
-            }}>
-                <div>
-                    <div style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>Total Scans</div>
-                    <div style={{ fontSize: '1.5rem', fontWeight: '900' }}>1,350</div>
-                </div>
-                <div>
-                    <div style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>Unique Users</div>
-                    <div style={{ fontSize: '1.5rem', fontWeight: '900' }}>4</div>
-                </div>
-                <div>
-                    <div style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>Success Rate</div>
-                    <div style={{ fontSize: '1.5rem', fontWeight: '900', color: 'var(--success)' }}>98.2%</div>
-                </div>
-                <div>
-                    <div style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>Avg Scans/User</div>
-                    <div style={{ fontSize: '1.5rem', fontWeight: '900' }}>337</div>
                 </div>
             </div>
         </div>
     );
 }
 
-const thStyle: React.CSSProperties = {
-    textAlign: 'left',
-    padding: '0.75rem',
-    fontWeight: '700',
-    fontSize: '0.85rem',
-    color: 'var(--muted-foreground)',
-};
+// Helper Components
+function StatsCard({ title, value, change, color }: { title: string, value: string, change: string, color: string }) {
+    const colorMap: { [key: string]: string } = {
+        blue: '#2563eb',
+        green: '#059669',
+        indigo: '#4f46e5',
+        purple: '#7c3aed'
+    };
 
-const tdStyle: React.CSSProperties = {
-    padding: '0.75rem',
-    fontSize: '0.9rem',
-};
+    return (
+        <div style={{ background: 'white', padding: '1.5rem', borderRadius: '0.5rem', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)' }}>
+            <div style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.5rem' }}>{title}</div>
+            <div style={{ fontSize: '1.875rem', fontWeight: 'bold', color: '#111827', marginBottom: '0.25rem' }}>{value}</div>
+            <div style={{ fontSize: '0.75rem', color: colorMap[color] }}>{change}</div>
+        </div>
+    );
+}
+
+function TabButton({ active, onClick, label }: { active: boolean, onClick: () => void, label: string }) {
+    return (
+        <button
+            onClick={onClick}
+            style={{
+                padding: '1rem 1.5rem',
+                fontSize: '0.875rem',
+                fontWeight: 500,
+                color: active ? '#2563eb' : '#6b7280',
+                borderBottom: active ? '2px solid #2563eb' : '2px solid transparent',
+                background: 'none',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+            }}
+        >
+            {label}
+        </button>
+    );
+}

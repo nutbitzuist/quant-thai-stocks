@@ -29,6 +29,7 @@ export interface ModelResult {
     sell_signals: Signal[];
     total_stocks_analyzed: number;
     stocks_with_data: number;
+    data_coverage_pct?: number;
 }
 
 // Log entry for status display

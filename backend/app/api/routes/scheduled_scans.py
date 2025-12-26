@@ -1,20 +1,25 @@
 """
 Scheduled Scans API Routes
-Manage scheduled daily model scans
+Manage scheduled daily model scans with user ownership
+Backed by PostgreSQL
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends, Query
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Any
 from datetime import datetime
-import uuid
-import json
-import os
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, delete
+
+from app.middleware.auth import require_user_id, verify_api_key
+from app.validation import validate_name, validate_schedule_time, validate_days
+from app.database import get_db
+from app.database.models import ScheduledScan as DBScheduledScan
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/scheduled-scans", tags=["scheduled-scans"])
-
-# Simple file-based storage for scheduled scans
-SCANS_FILE = os.path.join(os.path.dirname(__file__), "..", "..", "data", "scheduled_scans.json")
 
 
 class ScheduledScanCreate(BaseModel):
@@ -30,8 +35,9 @@ class ScheduledScanUpdate(BaseModel):
     enabled: bool
 
 
-class ScheduledScan(BaseModel):
+class ScheduledScanResponse(BaseModel):
     id: str
+    user_id: str
     model_id: str
     model_name: Optional[str] = None
     universe: str
@@ -41,169 +47,236 @@ class ScheduledScan(BaseModel):
     parameters: Optional[dict] = None
     created_at: str
     last_run: Optional[str] = None
+    deleted_at: Optional[str] = None
 
 
-def load_scans() -> List[dict]:
-    """Load scheduled scans from file"""
-    try:
-        os.makedirs(os.path.dirname(SCANS_FILE), exist_ok=True)
-        if os.path.exists(SCANS_FILE):
-            with open(SCANS_FILE, 'r') as f:
-                return json.load(f)
-    except Exception:
-        pass
-    return []
 
-
-def save_scans(scans: List[dict]):
-    """Save scheduled scans to file"""
-    try:
-        os.makedirs(os.path.dirname(SCANS_FILE), exist_ok=True)
-        with open(SCANS_FILE, 'w') as f:
-            json.dump(scans, f, indent=2)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to save scans: {e}")
-
+# Cache for model names to avoid repeated instantiation
+_MODEL_NAMES_CACHE = {}
 
 def get_model_name(model_id: str) -> str:
-    """Get model name from ID"""
+    """Get model name from ID with caching"""
+    if model_id in _MODEL_NAMES_CACHE:
+        return _MODEL_NAMES_CACHE[model_id]
+        
     from app.api.routes.models import ALL_MODELS
+    
     if model_id in ALL_MODELS:
         model_class = ALL_MODELS[model_id]
-        try:
-            instance = model_class()
-            return instance.name
-        except:
-            pass
+        # Try class attribute first fallback to instantiation
+        if hasattr(model_class, 'name') and isinstance(model_class.name, str):
+            name = model_class.name
+        else:
+            try:
+                instance = model_class()
+                name = instance.name
+            except Exception:
+                name = model_id
+                
+        _MODEL_NAMES_CACHE[model_id] = name
+        return name
+        
     return model_id
 
 
 @router.get("/")
-async def list_scheduled_scans():
-    """List all scheduled scans"""
-    scans = load_scans()
-    # Enrich with model names
-    for scan in scans:
-        if not scan.get('model_name'):
-            scan['model_name'] = get_model_name(scan['model_id'])
-    return {"scans": scans, "total": len(scans)}
-
-
-@router.post("/")
-async def create_scheduled_scan(scan: ScheduledScanCreate):
-    """Create a new scheduled scan"""
-    scans = load_scans()
+async def list_scheduled_scans(
+    user_id: str = Depends(require_user_id),
+    db: AsyncSession = Depends(get_db)
+):
+    """List all scheduled scans for the current user"""
+    query = select(DBScheduledScan).where(
+        DBScheduledScan.user_id == user_id,
+        DBScheduledScan.deleted_at.is_(None)
+    )
+    result = await db.execute(query)
+    scans = result.scalars().all()
     
-    new_scan = {
-        "id": str(uuid.uuid4())[:8],
+    # Convert to list of dicts/pydantic models
+    scan_list = []
+    for scan in scans:
+        scan_dict = {
+            "id": scan.id,
+            "user_id": scan.user_id,
+            "model_id": scan.model_id,
+            "model_name": scan.model_name or get_model_name(scan.model_id),
+            "universe": scan.universe,
+            "schedule_time": scan.schedule_time,
+            "days": scan.days,
+            "enabled": scan.enabled,
+            "parameters": scan.parameters,
+            "created_at": scan.created_at.isoformat() if scan.created_at else None,
+            "last_run": scan.last_run.isoformat() if scan.last_run else None,
+            "deleted_at": scan.deleted_at.isoformat() if scan.deleted_at else None
+        }
+        scan_list.append(scan_dict)
+    
+    return {"scans": scan_list, "total": len(scan_list)}
+
+
+@router.post("/", dependencies=[Depends(verify_api_key)])
+async def create_scheduled_scan(
+    scan: ScheduledScanCreate,
+    user_id: str = Depends(require_user_id),
+    db: AsyncSession = Depends(get_db)
+):
+    """Create a new scheduled scan for the current user"""
+    # Validate inputs
+    schedule_time = validate_schedule_time(scan.schedule_time)
+    days = validate_days(scan.days)
+    
+    # Validate model exists
+    from app.api.routes.models import ALL_MODELS
+    if scan.model_id not in ALL_MODELS:
+        raise HTTPException(status_code=400, detail=f"Unknown model: {scan.model_id}")
+    
+    new_scan = DBScheduledScan(
+        # ID auto-generated
+        user_id=user_id,
+        model_id=scan.model_id,
+        model_name=get_model_name(scan.model_id),
+        universe=scan.universe,
+        schedule_time=schedule_time,
+        days=days,
+        enabled=scan.enabled,
+        parameters=scan.parameters,
+        created_at=datetime.now()
+    )
+    
+    db.add(new_scan)
+    await db.commit()
+    await db.refresh(new_scan)
+    
+    logger.info(f"User {user_id} created scheduled scan: {new_scan.id}")
+    
+    # Update Scheduler
+    from app.scheduler import add_job_for_scan
+    add_job_for_scan(new_scan)
+    
+    return {
+        "message": "Scheduled scan created and scheduled",
+        "scan": {
+            "id": new_scan.id,
+            "model_name": new_scan.model_name,
+            "schedule_time": new_scan.schedule_time
+        }
+    }
+
+
+@router.get("/{scan_id}")
+async def get_scheduled_scan(
+    scan_id: str,
+    user_id: str = Depends(require_user_id),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get details of a specific scan"""
+    query = select(DBScheduledScan).where(DBScheduledScan.id == scan_id)
+    result = await db.execute(query)
+    scan = result.scalar_one_or_none()
+    
+    if not scan:
+        raise HTTPException(status_code=404, detail="Scan not found")
+        
+    if scan.deleted_at is not None:
+        raise HTTPException(status_code=404, detail="Scan not found")
+        
+    if scan.user_id != user_id:
+        raise HTTPException(status_code=403, detail="Not authorized to access this scan")
+        
+    return {
+        "id": scan.id,
+        "user_id": scan.user_id,
         "model_id": scan.model_id,
-        "model_name": get_model_name(scan.model_id),
+        "model_name": scan.model_name,
         "universe": scan.universe,
         "schedule_time": scan.schedule_time,
         "days": scan.days,
         "enabled": scan.enabled,
         "parameters": scan.parameters,
-        "created_at": datetime.now().isoformat(),
-        "last_run": None
+        "last_run": scan.last_run
     }
-    
-    scans.append(new_scan)
-    save_scans(scans)
-    
-    return {"message": "Scheduled scan created", "scan": new_scan}
 
 
-@router.get("/{scan_id}")
-async def get_scheduled_scan(scan_id: str):
-    """Get a specific scheduled scan"""
-    scans = load_scans()
-    for scan in scans:
-        if scan['id'] == scan_id:
-            scan['model_name'] = get_model_name(scan['model_id'])
-            return scan
-    raise HTTPException(status_code=404, detail="Scan not found")
-
-
-@router.put("/{scan_id}/toggle")
-async def toggle_scheduled_scan(scan_id: str, update: ScheduledScanUpdate):
-    """Enable/disable a scheduled scan"""
-    scans = load_scans()
-    for scan in scans:
-        if scan['id'] == scan_id:
-            scan['enabled'] = update.enabled
-            save_scans(scans)
-            return {"message": f"Scan {'enabled' if update.enabled else 'disabled'}", "scan": scan}
-    raise HTTPException(status_code=404, detail="Scan not found")
-
-
-@router.delete("/{scan_id}")
-async def delete_scheduled_scan(scan_id: str):
-    """Delete a scheduled scan"""
-    scans = load_scans()
-    original_length = len(scans)
-    scans = [s for s in scans if s['id'] != scan_id]
-    
-    if len(scans) == original_length:
-        raise HTTPException(status_code=404, detail="Scan not found")
-    
-    save_scans(scans)
-    return {"message": "Scan deleted"}
-
-
-@router.post("/{scan_id}/run")
-async def run_scheduled_scan_now(scan_id: str):
-    """Manually run a scheduled scan"""
-    from app.api.routes.models import ALL_MODELS, run_model_internal
-    
-    scans = load_scans()
-    scan = None
-    for s in scans:
-        if s['id'] == scan_id:
-            scan = s
-            break
+@router.put("/{scan_id}/toggle", dependencies=[Depends(verify_api_key)])
+async def toggle_scan(
+    scan_id: str,
+    update: ScheduledScanUpdate,
+    user_id: str = Depends(require_user_id),
+    db: AsyncSession = Depends(get_db)
+):
+    """Enable or disable a scheduled scan"""
+    query = select(DBScheduledScan).where(DBScheduledScan.id == scan_id)
+    result = await db.execute(query)
+    scan = result.scalar_one_or_none()
     
     if not scan:
         raise HTTPException(status_code=404, detail="Scan not found")
+        
+    if scan.deleted_at is not None:
+        raise HTTPException(status_code=404, detail="Scan not found")
+        
+    if scan.user_id != user_id:
+        raise HTTPException(status_code=403, detail="Not authorized to update this scan")
     
-    # Run the model
-    try:
-        result = await run_model_internal(
-            model_id=scan['model_id'],
-            universe=scan['universe'],
-            top_n=20,
-            parameters=scan.get('parameters')
+    scan.enabled = update.enabled
+    await db.commit()
+    await db.refresh(scan)
+    
+    # Update Scheduler
+    from app.scheduler import add_job_for_scan, remove_job
+    if scan.enabled:
+        add_job_for_scan(scan)
+    else:
+        remove_job(scan.id)
+    
+    status_str = "enabled" if scan.enabled else "disabled"
+    return {"message": f"Scan {status_str}", "enabled": scan.enabled}
+
+
+@router.delete("/{scan_id}", dependencies=[Depends(verify_api_key)])
+async def delete_scan(
+    scan_id: str,
+    user_id: str = Depends(require_user_id),
+    confirm: bool = Query(False, description="Set to true to confirm deletion"),
+    db: AsyncSession = Depends(get_db)
+):
+    """Delete a scheduled scan"""
+    if not confirm:
+        raise HTTPException(
+            status_code=400, 
+            detail="Deletion requires confirmation. Add ?confirm=true to the request."
         )
         
-        # Update last run time
-        scan['last_run'] = datetime.now().isoformat()
-        save_scans(scans)
+    query = select(DBScheduledScan).where(DBScheduledScan.id == scan_id)
+    result = await db.execute(query)
+    scan = result.scalar_one_or_none()
+    
+    if not scan:
+        raise HTTPException(status_code=404, detail="Scan not found")
         
-        return {
-            "message": "Scan executed successfully",
-            "scan_id": scan_id,
-            "result": result
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to run scan: {e}")
-
-
-@router.get("/due")
-async def get_due_scans():
-    """Get scans that are due to run (for scheduler)"""
-    from datetime import datetime
+    if scan.user_id != user_id:
+         raise HTTPException(status_code=403, detail="Not authorized to delete this scan")
+         
+    # Soft delete
+    scan.deleted_at = datetime.now()
+    await db.commit()
     
-    scans = load_scans()
-    now = datetime.now()
-    current_time = now.strftime("%H:%M")
-    current_day = now.strftime("%a")
+    # Remove from Scheduler
+    from app.scheduler import remove_job
+    remove_job(scan.id)
     
-    due_scans = []
-    for scan in scans:
-        if not scan.get('enabled', False):
-            continue
-        if current_day not in scan.get('days', []):
-            continue
-        if scan.get('schedule_time') == current_time:
-            due_scans.append(scan)
+    # Audit Log
+    from app.services.audit import get_audit_service
+    audit_service = get_audit_service()
+    await audit_service.log(
+        db=db,
+        user_id=user_id,
+        action="DELETE_SCHEDULED_SCAN",
+        resource_type="scheduled_scan",
+        resource_id=scan_id,
+        details={"soft_delete": True}
+    )
+    # Commit audit log
+    await db.commit()
     
-    return {"due_scans": due_scans, "current_time": current_time, "current_day": current_day}
+    return {"message": "Scheduled scan deleted and unscheduled"}

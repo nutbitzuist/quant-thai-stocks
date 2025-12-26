@@ -2,84 +2,19 @@
 
 import { useState, useEffect } from 'react';
 import Navbar from '../components/Navbar';
+import {
+  Signal,
+  Model,
+  ModelResult,
+  Log,
+  BacktestResult,
+  API_URL
+} from '@/types/dashboard';
 
-// API URL - can be overridden by environment variable
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+// Types - imported from @/types/dashboard
+import { S } from '@/styles/dashboard';
+import ModelList from '@/components/dashboard/ModelList';
 
-// Types
-interface Signal { ticker: string; signal_type: string; score: number; price_at_signal: number; }
-interface Model { id: string; name: string; description: string; category: string; default_parameters?: Record<string, any>; }
-interface ModelResult { run_id: string; model_name: string; category: string; buy_signals: Signal[]; sell_signals: Signal[]; total_stocks_analyzed: number; stocks_with_data: number; }
-interface Log { time: string; type: 'info' | 'error' | 'success'; message: string; }
-interface BacktestResult {
-  // Common fields
-  model_name?: string;
-  strategy_name?: string;  // VectorBT uses this
-  universe?: string;
-  period?: string;
-  start_date?: string;    // VectorBT uses this
-  end_date?: string;      // VectorBT uses this
-
-  // Simple backtester format (nested)
-  performance?: {
-    initial_capital: number;
-    final_value: number;
-    total_return_pct: number;
-    annualized_return_pct: number;
-    max_drawdown_pct: number;
-    sharpe_ratio: number;
-  };
-  trades?: {
-    total: number;
-    winning: number;
-    losing: number;
-    win_rate_pct: number;
-    avg_win_pct: number;
-    avg_loss_pct: number;
-    profit_factor: number;
-  };
-
-  // VectorBT format (flat)
-  initial_capital?: number;
-  final_value?: number;
-  total_return?: number;
-  annual_return?: number;
-  benchmark_return?: number;
-  alpha?: number;
-  volatility?: number;
-  sharpe_ratio?: number;
-  sortino_ratio?: number;
-  max_drawdown?: number;
-  max_drawdown_duration?: number;
-  calmar_ratio?: number;
-  total_trades?: number;
-  winning_trades?: number;
-  losing_trades?: number;
-  win_rate?: number;
-  avg_win?: number;
-  avg_loss?: number;
-  profit_factor?: number;
-  avg_trade_duration?: number;
-  best_day?: number;
-  worst_day?: number;
-  avg_daily_return?: number;
-
-  // Time series data (VectorBT)
-  equity_curve?: Array<{ date: string; value?: number; equity?: number }>;
-  drawdown_curve?: Array<{ date: string; drawdown: number }>;
-  monthly_returns?: Array<{ month: string; return: number }>;
-
-  // Trades
-  recent_trades?: Array<{
-    entry_date: string;
-    exit_date: string;
-    ticker: string;
-    entry_price: number;
-    exit_price: number;
-    return_pct: number;
-    pnl: number;
-  }>;
-}
 
 // Helper function to remove markdown formatting
 const cleanMarkdown = (text: string): string => {
@@ -89,95 +24,6 @@ const cleanMarkdown = (text: string): string => {
 };
 
 // Neo-Brutalist Style Object - HQ0 inspired
-const S = {
-  card: {
-    background: 'var(--card)',
-    color: 'var(--card-foreground)',
-    borderRadius: '0',
-    padding: '1.25rem',
-    marginBottom: '1rem',
-    boxShadow: '4px 4px 0 var(--border)',
-    border: '3px solid var(--border)',
-    transition: 'transform 0.1s ease, box-shadow 0.1s ease'
-  } as React.CSSProperties,
-  btn: (v: string) => ({
-    padding: '0.625rem 1.25rem',
-    background: v === 'primary' ? 'var(--primary)' : v === 'success' ? '#22c55e' : v === 'danger' ? 'var(--destructive)' : 'var(--card)',
-    color: v === 'primary' || v === 'success' || v === 'danger' ? '#ffffff' : 'var(--foreground)',
-    border: '3px solid var(--border)',
-    borderRadius: '0',
-    cursor: 'pointer',
-    marginRight: '0.5rem',
-    fontSize: '0.875rem',
-    fontWeight: '700',
-    transition: 'transform 0.1s ease, box-shadow 0.1s ease',
-    boxShadow: '3px 3px 0 var(--border)',
-    textTransform: 'uppercase' as const,
-    letterSpacing: '0.5px'
-  } as React.CSSProperties & { onMouseEnter?: (e: React.MouseEvent<HTMLButtonElement>) => void; onMouseLeave?: (e: React.MouseEvent<HTMLButtonElement>) => void }),
-  select: {
-    padding: '0.625rem 0.875rem',
-    borderRadius: '0',
-    border: '3px solid var(--border)',
-    marginRight: '0.625rem',
-    fontSize: '0.875rem',
-    fontWeight: '600',
-    background: 'var(--card)',
-    color: 'var(--foreground)',
-    boxShadow: '3px 3px 0 var(--border)',
-    cursor: 'pointer'
-  } as React.CSSProperties,
-  tab: (a: boolean) => ({
-    padding: '0.625rem 1.25rem',
-    background: a ? 'var(--primary)' : 'var(--card)',
-    color: a ? '#ffffff' : 'var(--foreground)',
-    border: '3px solid var(--border)',
-    borderRadius: '0',
-    cursor: 'pointer',
-    fontWeight: '700',
-    fontSize: '0.875rem',
-    transition: 'transform 0.1s ease, box-shadow 0.1s ease',
-    boxShadow: a ? '4px 4px 0 var(--border)' : '3px 3px 0 var(--border)',
-    textTransform: 'uppercase' as const
-  } as React.CSSProperties),
-  dot: (ok: boolean) => ({
-    width: '12px',
-    height: '12px',
-    borderRadius: '0',
-    background: ok ? '#22c55e' : 'var(--destructive)',
-    display: 'inline-block',
-    marginRight: '0.5rem',
-    border: '2px solid var(--border)'
-  } as React.CSSProperties),
-  input: {
-    padding: '0.625rem 0.875rem',
-    borderRadius: '0',
-    border: '3px solid var(--border)',
-    width: '100%',
-    marginBottom: '0.625rem',
-    fontSize: '0.875rem',
-    fontWeight: '500',
-    background: 'var(--card)',
-    color: 'var(--foreground)',
-    transition: 'box-shadow 0.1s ease',
-    boxShadow: '2px 2px 0 var(--border)'
-  } as React.CSSProperties,
-  textarea: {
-    padding: '0.625rem 0.875rem',
-    borderRadius: '0',
-    border: '3px solid var(--border)',
-    width: '100%',
-    minHeight: '100px',
-    marginBottom: '0.625rem',
-    fontSize: '0.875rem',
-    fontWeight: '500',
-    fontFamily: 'var(--font-mono)',
-    background: 'var(--card)',
-    color: 'var(--foreground)',
-    transition: 'box-shadow 0.1s ease',
-    boxShadow: '2px 2px 0 var(--border)'
-  } as React.CSSProperties,
-};
 
 // Helper for market icons
 const getMarketIcon = (market: string) => {
@@ -1947,45 +1793,17 @@ export default function Home() {
 
             {/* MODELS */}
             {tab === 'models' && (
-              <>
-                {!connected && <div style={{ ...S.card, background: 'var(--accent)', borderLeft: '4px solid var(--primary)', color: 'var(--accent-foreground)' }}><h3 style={{ margin: '0 0 0.5rem 0' }}>⚠️ Backend Not Connected</h3><p style={{ margin: 0 }}>Make sure the backend is running and accessible.</p></div>}
-                {connected && (
-                  <>
-                    {/* All Models or Technical */}
-                    {(modelSubTab === 'all' || modelSubTab === 'technical') && (
-                      <>
-                        <h2>📊 Technical Models ({models.filter(m => m.category === 'Technical').length})</h2>
-                        <p style={{ color: 'var(--muted-foreground)', marginBottom: '15px' }}>Chart patterns, indicators, and price action strategies</p>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '15px', marginBottom: '30px' }}>
-                          {models.filter(m => m.category === 'Technical').map(m => <ModelCard key={m.id} model={m} result={results[m.id]} running={running === m.id} onRun={() => runModel(m.id)} onPDF={downloadPDF} onEnhancedPDF={downloadEnhancedPDF} onRunWithParams={(params) => runModelWithParams(m.id, params)} />)}
-                        </div>
-                      </>
-                    )}
-
-                    {/* All Models or Fundamental */}
-                    {(modelSubTab === 'all' || modelSubTab === 'fundamental') && (
-                      <>
-                        <h2 style={{ marginTop: modelSubTab === 'all' ? '30px' : '0' }}>💰 Fundamental Models ({models.filter(m => m.category === 'Fundamental').length})</h2>
-                        <p style={{ color: 'var(--muted-foreground)', marginBottom: '15px' }}>Value investing, quality metrics, and financial analysis</p>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '15px', marginBottom: '30px' }}>
-                          {models.filter(m => m.category === 'Fundamental').map(m => <ModelCard key={m.id} model={m} result={results[m.id]} running={running === m.id} onRun={() => runModel(m.id)} onPDF={downloadPDF} onEnhancedPDF={downloadEnhancedPDF} onRunWithParams={(params) => runModelWithParams(m.id, params)} />)}
-                        </div>
-                      </>
-                    )}
-
-                    {/* All Models or Quantitative */}
-                    {(modelSubTab === 'all' || modelSubTab === 'quantitative') && (
-                      <>
-                        <h2 style={{ marginTop: modelSubTab === 'all' ? '30px' : '0' }}>🔢 Quantitative Models ({models.filter(m => m.category === 'Quantitative').length})</h2>
-                        <p style={{ color: 'var(--muted-foreground)', marginBottom: '15px' }}>Statistical arbitrage and quantitative strategies</p>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '15px' }}>
-                          {models.filter(m => m.category === 'Quantitative').map(m => <ModelCard key={m.id} model={m} result={results[m.id]} running={running === m.id} onRun={() => runModel(m.id)} onPDF={downloadPDF} onEnhancedPDF={downloadEnhancedPDF} onRunWithParams={(params) => runModelWithParams(m.id, params)} />)}
-                        </div>
-                      </>
-                    )}
-                  </>
-                )}
-              </>
+              <ModelList
+                models={models}
+                modelSubTab={modelSubTab}
+                results={results}
+                running={running}
+                connected={connected}
+                onRun={runModel}
+                onPDF={downloadPDF}
+                onEnhancedPDF={downloadEnhancedPDF}
+                onRunWithParams={runModelWithParams}
+              />
             )}
 
             {/* STOCK ANALYZER */}
@@ -4036,117 +3854,3 @@ export default function Home() {
 }
 
 // Model Card Component with Parameter Customization
-function ModelCard({ model, result, running, onRun, onPDF, onEnhancedPDF, onRunWithParams }: {
-  model: Model;
-  result?: ModelResult;
-  running: boolean;
-  onRun: () => void;
-  onPDF: (id: string) => void;
-  onEnhancedPDF: (modelId: string) => void;
-  onRunWithParams?: (params: Record<string, any>) => void;
-}) {
-  const [showParams, setShowParams] = useState(false);
-  const [customParams, setCustomParams] = useState<Record<string, any>>(model.default_parameters || {});
-
-  const handleParamChange = (key: string, value: any) => {
-    setCustomParams(prev => ({ ...prev, [key]: value }));
-  };
-
-  const runWithCustomParams = () => {
-    if (onRunWithParams) {
-      onRunWithParams(customParams);
-    }
-    setShowParams(false);
-  };
-
-  const getCategoryColor = () => {
-    if (model.category === 'Technical') return { bg: 'var(--accent)', color: 'var(--accent-foreground)' };
-    if (model.category === 'Quantitative') return { bg: '#8b5cf6', color: 'white' };
-    return { bg: 'var(--muted)', color: 'var(--muted-foreground)' };
-  };
-
-  const catStyle = getCategoryColor();
-
-  return (
-    <div style={S.card}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div>
-          <h3 style={{ margin: 0, fontFamily: 'var(--font-sans)', fontWeight: '700' }}>{model.name}</h3>
-          <span style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '0', background: catStyle.bg, color: catStyle.color, border: '2px solid var(--border)', fontWeight: '700', textTransform: 'uppercase' as const, display: 'inline-block', marginTop: '6px' }}>{model.category}</span>
-        </div>
-        <div style={{ display: 'flex', gap: '5px' }}>
-          <button style={{ ...S.btn('secondary'), fontSize: '11px', padding: '4px 8px' }} onClick={() => setShowParams(!showParams)} title="Customize Parameters">⚙️</button>
-          <button style={{ ...S.btn('primary'), opacity: running ? 0.6 : 1 }} onClick={onRun} disabled={running}>{running ? '⏳...' : '▶ Run'}</button>
-        </div>
-      </div>
-      <p style={{ color: 'var(--muted-foreground)', fontSize: '12px', margin: '10px 0' }}>{model.description}</p>
-
-      {/* Parameter Customization Panel */}
-      {showParams && model.default_parameters && (
-        <div style={{ background: 'var(--muted)', padding: '16px', borderRadius: '0', marginBottom: '12px', border: '3px solid var(--border)', boxShadow: '4px 4px 0 var(--border)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', borderBottom: '2px solid var(--border)', paddingBottom: '10px' }}>
-            <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '700', fontFamily: 'var(--font-sans)', textTransform: 'uppercase' as const }}>⚙️ Custom Parameters</h4>
-            <button style={{ background: 'var(--card)', border: '2px solid var(--border)', cursor: 'pointer', fontSize: '14px', padding: '4px 8px', fontWeight: '700', boxShadow: '2px 2px 0 var(--border)' }} onClick={() => setShowParams(false)}>✕</button>
-          </div>
-          <div style={{ display: 'grid', gap: '8px' }}>
-            {Object.entries(model.default_parameters).map(([key, defaultValue]) => (
-              <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <label style={{ fontSize: '11px', minWidth: '120px', color: 'var(--foreground)' }}>{key.replace(/_/g, ' ')}</label>
-                {typeof defaultValue === 'boolean' ? (
-                  <input
-                    type="checkbox"
-                    checked={customParams[key] ?? defaultValue}
-                    onChange={(e) => handleParamChange(key, e.target.checked)}
-                  />
-                ) : typeof defaultValue === 'number' ? (
-                  <input
-                    type="number"
-                    style={{ ...S.input, width: '80px', marginBottom: 0, padding: '4px 8px' }}
-                    value={customParams[key] ?? defaultValue}
-                    onChange={(e) => handleParamChange(key, parseFloat(e.target.value) || 0)}
-                    step={defaultValue < 1 ? 0.1 : 1}
-                  />
-                ) : (
-                  <input
-                    type="text"
-                    style={{ ...S.input, width: '100px', marginBottom: 0, padding: '4px 8px' }}
-                    value={customParams[key] ?? defaultValue}
-                    onChange={(e) => handleParamChange(key, e.target.value)}
-                  />
-                )}
-              </div>
-            ))}
-          </div>
-          <div style={{ marginTop: '10px', display: 'flex', gap: '8px' }}>
-            <button style={{ ...S.btn('success'), fontSize: '11px', padding: '6px 12px' }} onClick={runWithCustomParams} disabled={running}>
-              {running ? '⏳...' : '▶ Run with Custom'}
-            </button>
-            <button style={{ ...S.btn('secondary'), fontSize: '11px', padding: '6px 12px' }} onClick={() => setCustomParams(model.default_parameters || {})}>
-              Reset
-            </button>
-          </div>
-        </div>
-      )}
-
-      {result && (
-        <div style={{ borderTop: '1px solid var(--border)', paddingTop: '10px' }}>
-          <div style={{ display: 'flex', gap: '10px', marginBottom: '8px', fontSize: '12px', flexWrap: 'wrap' }}>
-            <span style={{ color: '#22c55e' }}>✅ {result.buy_signals.length} Buy</span>
-            <span style={{ color: 'var(--destructive)' }}>🔻 {result.sell_signals.length} Sell</span>
-            <span style={{ color: 'var(--muted-foreground)' }}>{result.stocks_with_data}/{result.total_stocks_analyzed} stocks</span>
-            <span style={{ color: 'var(--muted-foreground)', fontSize: '11px', fontStyle: 'italic' }}>(Top signals shown)</span>
-          </div>
-          {result.buy_signals.slice(0, 4).map((s, i) => (
-            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', padding: '3px 0' }}>
-              <b>{s.ticker.replace('.BK', '')}</b><span>${s.price_at_signal.toFixed(2)}</span><span style={{ color: '#22c55e' }}>{s.score.toFixed(0)}</span>
-            </div>
-          ))}
-          <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
-            <button style={{ ...S.btn('secondary'), fontSize: '11px' }} onClick={() => onPDF(result.run_id)}>📄 PDF</button>
-            <button style={{ ...S.btn('primary'), fontSize: '11px' }} onClick={() => onEnhancedPDF(model.id)}>📊 Enhanced PDF</button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}

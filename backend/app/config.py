@@ -10,7 +10,17 @@ import os
 class Settings(BaseSettings):
     # App
     app_name: str = "Quant Stock Analysis"
-    debug: bool = os.getenv("DEBUG", "true").lower() == "true"
+    debug: bool = os.getenv("DEBUG", "false").lower() == "true"  # Default to false for security
+    
+    # Security
+    api_secret_key: str = os.getenv("API_SECRET_KEY", "")
+    rate_limit_enabled: bool = os.getenv("RATE_LIMIT_ENABLED", "true").lower() == "true"
+    sentry_dsn: str = os.getenv("SENTRY_DSN", "")
+
+    # Payments (LemonSqueezy)
+    lemonsqueezy_api_key: str = os.getenv("LEMONSQUEEZY_API_KEY", "")
+    lemonsqueezy_store_id: str = os.getenv("LEMONSQUEEZY_STORE_ID", "")
+    lemonsqueezy_webhook_secret: str = os.getenv("LEMONSQUEEZY_WEBHOOK_SECRET", "")
     
     # CORS - Allow frontend connections
     # Can be set via CORS_ORIGINS environment variable (JSON array or comma-separated)

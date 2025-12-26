@@ -1,5 +1,6 @@
 import './globals.css'
 import { ClerkProvider } from '@clerk/nextjs'
+import { Toaster } from 'sonner'
 import ErrorBoundary from './components/ErrorBoundary'
 
 export const metadata = {
@@ -30,6 +31,7 @@ export default function RootLayout({
           ) : (
             children
           )}
+          <Toaster richColors position="top-right" />
         </ErrorBoundary>
       </body>
     </html>

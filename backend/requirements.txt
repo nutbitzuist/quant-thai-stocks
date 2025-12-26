@@ -3,15 +3,20 @@ fastapi>=0.109.0
 uvicorn[standard]>=0.27.0
 pydantic>=2.5.0
 pydantic-settings>=2.1.0
+sentry-sdk[fastapi]>=1.40.0
 
 # Database
 sqlalchemy>=2.0.0
 asyncpg>=0.29.0  # Async PostgreSQL driver
 psycopg2-binary>=2.9.9  # Sync PostgreSQL driver (for migrations)
 alembic>=1.13.0  # Database migrations
+greenlet>=3.0.0
+greenlet>=3.0.0
+aiosqlite>=0.19.0
+cryptography>=41.0.0
 
 # Data & Finance
-yfinance>=0.2.36  # Primary data source (Yahoo Finance)
+yfinance==0.2.28  # Primary data source (Yahoo Finance)
 pandas>=2.1.0
 numpy>=1.26.0
 scipy>=1.11.0  # Statistical functions for model validation
@@ -35,10 +40,11 @@ aiohttp>=3.9.0
 # Utilities
 python-dotenv>=1.0.0
 python-multipart>=0.0.6
+slowapi>=0.1.9
 
 # Backtesting & Performance Analysis
-vectorbt>=0.26.0  # High-performance backtesting
-quantstats>=0.0.62  # Performance reports and tearsheets
+# vectorbt>=0.26.0  # High-performance backtesting
+# quantstats>=0.0.62  # Performance reports and tearsheets
 
 # Visualization (for generating charts)
 plotly>=5.18.0

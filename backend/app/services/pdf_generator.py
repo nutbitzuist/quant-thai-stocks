@@ -158,6 +158,22 @@ class PDFReportGenerator:
         date_str = dt.strftime('%B %d, %Y')
         time_str = dt.strftime('%H:%M:%S')
         return f"{date_str} at {time_str} GMT+7"
+
+    def create_model_run_report(self, record: Dict, limit: int = 15) -> bytes:
+        """Helper to generate report from history record dict"""
+        return self.generate_model_report(
+            model_name=record.get('model_name', 'Unknown Model'),
+            category=record.get('category', 'Unknown'),
+            universe=record.get('universe', 'Unknown'),
+            buy_signals=record.get('buy_signals', []),
+            sell_signals=record.get('sell_signals', []),
+            total_analyzed=record.get('total_analyzed', 0),
+            stocks_with_data=record.get('stocks_with_data', 0),
+            parameters=record.get('parameters', {}),
+            description=record.get('description', ""),
+            run_timestamp=record.get('run_timestamp'),
+            limit=limit
+        )
     
     def generate_model_report(
         self,
