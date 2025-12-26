@@ -2,21 +2,26 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useAuth } from '@clerk/nextjs';
+import { useAuth, useUser } from '@clerk/nextjs';
 import { API_URL } from '@/types/dashboard';
 
 interface UpgradeButtonProps {
-    variantId: string;
+    priceId: string;
     className?: string;
     children?: React.ReactNode;
 }
 
-export function UpgradeButton({ variantId, className = "", children }: UpgradeButtonProps) {
-    const { getToken, user } = useAuth();
+export function UpgradeButton({ priceId, className = "", children }: UpgradeButtonProps) {
+    const { getToken } = useAuth();
+    const { user } = useUser();
     const [loading, setLoading] = useState(false);
 
     const handleUpgrade = async () => {
-        if (!user) return;
+        if (!user) {
+            // Redirect to login if not authenticated
+            window.location.href = '/sign-in';
+            return;
+        }
 
         try {
             setLoading(true);
@@ -30,13 +35,17 @@ export function UpgradeButton({ variantId, className = "", children }: UpgradeBu
                     'X-User-ID': user.id
                 },
                 body: JSON.stringify({
-                    variant_id: variantId,
+                    price_id: priceId,
                     user_email: user.primaryEmailAddress?.emailAddress,
-                    user_name: user.fullName
+                    success_url: `${window.location.origin}/dashboard?success=true`,
+                    cancel_url: `${window.location.origin}/pricing?canceled=true`
                 })
             });
 
-            if (!res.ok) throw new Error('Failed to create checkout');
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.detail || 'Failed to create checkout');
+            }
 
             const data = await res.json();
             if (data.url) {
@@ -56,7 +65,7 @@ export function UpgradeButton({ variantId, className = "", children }: UpgradeBu
             disabled={loading}
             className={`px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors disabled:opacity-50 ${className}`}
         >
-            {loading ? 'Process...' : (children || 'Upgrade to Pro')}
+            {loading ? 'Redirecting...' : (children || 'Upgrade to Pro')}
         </button>
     );
 }

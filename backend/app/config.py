@@ -17,10 +17,10 @@ class Settings(BaseSettings):
     rate_limit_enabled: bool = os.getenv("RATE_LIMIT_ENABLED", "true").lower() == "true"
     sentry_dsn: str = os.getenv("SENTRY_DSN", "")
 
-    # Payments (LemonSqueezy)
-    lemonsqueezy_api_key: str = os.getenv("LEMONSQUEEZY_API_KEY", "")
-    lemonsqueezy_store_id: str = os.getenv("LEMONSQUEEZY_STORE_ID", "")
-    lemonsqueezy_webhook_secret: str = os.getenv("LEMONSQUEEZY_WEBHOOK_SECRET", "")
+    # Payments (Stripe)
+    stripe_secret_key: str = os.getenv("STRIPE_SECRET_KEY", "")
+    stripe_webhook_secret: str = os.getenv("STRIPE_WEBHOOK_SECRET", "")
+    stripe_price_id_pro: str = os.getenv("STRIPE_PRICE_ID_PRO", "")
     
     # CORS - Allow frontend connections
     # Can be set via CORS_ORIGINS environment variable (JSON array or comma-separated)

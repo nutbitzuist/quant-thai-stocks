@@ -9,22 +9,25 @@ from app.middleware.auth import require_user_id
 router = APIRouter()
 
 class CheckoutRequest(BaseModel):
-    variant_id: str
+    price_id: str
     user_email: str
-    user_name: Optional[str] = None
+    success_url: str
+    cancel_url: str
 
 @router.post("/checkout")
 async def create_checkout_link(
     req: CheckoutRequest,
     user_id: str = Depends(require_user_id)
 ):
-    """Generate a LemonSqueezy checkout link"""
+    """Generate a Stripe checkout link"""
     billing = get_billing_service()
     
-    url = await billing.create_checkout_link(
-        variant_id=req.variant_id,
+    url = await billing.create_checkout_session(
+        price_id=req.price_id,
         user_email=req.user_email,
-        user_name=req.user_name
+        success_url=req.success_url,
+        cancel_url=req.cancel_url,
+        user_id=user_id
     )
     
     if not url:

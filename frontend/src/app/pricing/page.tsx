@@ -2,8 +2,8 @@
 import React from 'react';
 import { UpgradeButton } from '@/components/billing/UpgradeButton';
 
-// Replace with your actual LemonSqueezy Variant IDs
-const PRO_VARIANT_ID = "123456";
+// Replace with your actual Stripe Price ID (e.g., price_12345)
+const STRIPE_PRICE_ID = "price_1234567890";
 
 export default function PricingPage() {
     return (
@@ -41,7 +41,7 @@ export default function PricingPage() {
                             <li className="flex items-center">✓ API Access</li>
                         </ul>
                         <UpgradeButton
-                            variantId={PRO_VARIANT_ID}
+                            priceId={STRIPE_PRICE_ID}
                             className="w-full py-3 rounded-lg bg-blue-600 hover:bg-blue-700 font-semibold"
                         >
                             Upgrade Now
