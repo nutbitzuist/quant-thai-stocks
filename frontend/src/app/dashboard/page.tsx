@@ -1,0 +1,4152 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import Navbar from '../components/Navbar';
+
+// API URL - can be overridden by environment variable
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
+// Types
+interface Signal { ticker: string; signal_type: string; score: number; price_at_signal: number; }
+interface Model { id: string; name: string; description: string; category: string; default_parameters?: Record<string, any>; }
+interface ModelResult { run_id: string; model_name: string; category: string; buy_signals: Signal[]; sell_signals: Signal[]; total_stocks_analyzed: number; stocks_with_data: number; }
+interface Log { time: string; type: 'info' | 'error' | 'success'; message: string; }
+interface BacktestResult {
+  // Common fields
+  model_name?: string;
+  strategy_name?: string;  // VectorBT uses this
+  universe?: string;
+  period?: string;
+  start_date?: string;    // VectorBT uses this
+  end_date?: string;      // VectorBT uses this
+
+  // Simple backtester format (nested)
+  performance?: {
+    initial_capital: number;
+    final_value: number;
+    total_return_pct: number;
+    annualized_return_pct: number;
+    max_drawdown_pct: number;
+    sharpe_ratio: number;
+  };
+  trades?: {
+    total: number;
+    winning: number;
+    losing: number;
+    win_rate_pct: number;
+    avg_win_pct: number;
+    avg_loss_pct: number;
+    profit_factor: number;
+  };
+
+  // VectorBT format (flat)
+  initial_capital?: number;
+  final_value?: number;
+  total_return?: number;
+  annual_return?: number;
+  benchmark_return?: number;
+  alpha?: number;
+  volatility?: number;
+  sharpe_ratio?: number;
+  sortino_ratio?: number;
+  max_drawdown?: number;
+  max_drawdown_duration?: number;
+  calmar_ratio?: number;
+  total_trades?: number;
+  winning_trades?: number;
+  losing_trades?: number;
+  win_rate?: number;
+  avg_win?: number;
+  avg_loss?: number;
+  profit_factor?: number;
+  avg_trade_duration?: number;
+  best_day?: number;
+  worst_day?: number;
+  avg_daily_return?: number;
+
+  // Time series data (VectorBT)
+  equity_curve?: Array<{ date: string; value?: number; equity?: number }>;
+  drawdown_curve?: Array<{ date: string; drawdown: number }>;
+  monthly_returns?: Array<{ month: string; return: number }>;
+
+  // Trades
+  recent_trades?: Array<{
+    entry_date: string;
+    exit_date: string;
+    ticker: string;
+    entry_price: number;
+    exit_price: number;
+    return_pct: number;
+    pnl: number;
+  }>;
+}
+
+// Helper function to remove markdown formatting
+const cleanMarkdown = (text: string): string => {
+  if (!text) return text;
+  // Remove both single and double asterisks (markdown bold/italic)
+  return text.replace(/\*\*/g, '').replace(/\*/g, '').trim();
+};
+
+// Neo-Brutalist Style Object - HQ0 inspired
+const S = {
+  card: {
+    background: 'var(--card)',
+    color: 'var(--card-foreground)',
+    borderRadius: '0',
+    padding: '1.25rem',
+    marginBottom: '1rem',
+    boxShadow: '4px 4px 0 var(--border)',
+    border: '3px solid var(--border)',
+    transition: 'transform 0.1s ease, box-shadow 0.1s ease'
+  } as React.CSSProperties,
+  btn: (v: string) => ({
+    padding: '0.625rem 1.25rem',
+    background: v === 'primary' ? 'var(--primary)' : v === 'success' ? '#22c55e' : v === 'danger' ? 'var(--destructive)' : 'var(--card)',
+    color: v === 'primary' || v === 'success' || v === 'danger' ? '#ffffff' : 'var(--foreground)',
+    border: '3px solid var(--border)',
+    borderRadius: '0',
+    cursor: 'pointer',
+    marginRight: '0.5rem',
+    fontSize: '0.875rem',
+    fontWeight: '700',
+    transition: 'transform 0.1s ease, box-shadow 0.1s ease',
+    boxShadow: '3px 3px 0 var(--border)',
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.5px'
+  } as React.CSSProperties & { onMouseEnter?: (e: React.MouseEvent<HTMLButtonElement>) => void; onMouseLeave?: (e: React.MouseEvent<HTMLButtonElement>) => void }),
+  select: {
+    padding: '0.625rem 0.875rem',
+    borderRadius: '0',
+    border: '3px solid var(--border)',
+    marginRight: '0.625rem',
+    fontSize: '0.875rem',
+    fontWeight: '600',
+    background: 'var(--card)',
+    color: 'var(--foreground)',
+    boxShadow: '3px 3px 0 var(--border)',
+    cursor: 'pointer'
+  } as React.CSSProperties,
+  tab: (a: boolean) => ({
+    padding: '0.625rem 1.25rem',
+    background: a ? 'var(--primary)' : 'var(--card)',
+    color: a ? '#ffffff' : 'var(--foreground)',
+    border: '3px solid var(--border)',
+    borderRadius: '0',
+    cursor: 'pointer',
+    fontWeight: '700',
+    fontSize: '0.875rem',
+    transition: 'transform 0.1s ease, box-shadow 0.1s ease',
+    boxShadow: a ? '4px 4px 0 var(--border)' : '3px 3px 0 var(--border)',
+    textTransform: 'uppercase' as const
+  } as React.CSSProperties),
+  dot: (ok: boolean) => ({
+    width: '12px',
+    height: '12px',
+    borderRadius: '0',
+    background: ok ? '#22c55e' : 'var(--destructive)',
+    display: 'inline-block',
+    marginRight: '0.5rem',
+    border: '2px solid var(--border)'
+  } as React.CSSProperties),
+  input: {
+    padding: '0.625rem 0.875rem',
+    borderRadius: '0',
+    border: '3px solid var(--border)',
+    width: '100%',
+    marginBottom: '0.625rem',
+    fontSize: '0.875rem',
+    fontWeight: '500',
+    background: 'var(--card)',
+    color: 'var(--foreground)',
+    transition: 'box-shadow 0.1s ease',
+    boxShadow: '2px 2px 0 var(--border)'
+  } as React.CSSProperties,
+  textarea: {
+    padding: '0.625rem 0.875rem',
+    borderRadius: '0',
+    border: '3px solid var(--border)',
+    width: '100%',
+    minHeight: '100px',
+    marginBottom: '0.625rem',
+    fontSize: '0.875rem',
+    fontWeight: '500',
+    fontFamily: 'var(--font-mono)',
+    background: 'var(--card)',
+    color: 'var(--foreground)',
+    transition: 'box-shadow 0.1s ease',
+    boxShadow: '2px 2px 0 var(--border)'
+  } as React.CSSProperties,
+};
+
+// Helper for market icons
+const getMarketIcon = (market: string) => {
+  if (market === 'US') return '🇺🇸';
+  if (market === 'Thailand') return '🇹🇭';
+  return '🌐';
+};
+
+const UniverseSelector = ({
+  current,
+  universes,
+  customUniverses,
+  onChange,
+  sidebarCollapsed
+}: {
+  current: string;
+  universes: any[];
+  customUniverses: any[];
+  onChange: (id: string) => void;
+  sidebarCollapsed: boolean;
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const selected = universes.find(u => u.id === current) || customUniverses.find(u => u.id === current) || universes[0];
+
+  useEffect(() => {
+    const close = () => setIsOpen(false);
+    if (isOpen) window.addEventListener('click', close);
+    return () => window.removeEventListener('click', close);
+  }, [isOpen]);
+
+  if (sidebarCollapsed) {
+    return (
+      <div style={{ textAlign: 'center', cursor: 'pointer' }} onClick={() => setIsOpen(!isOpen)} title={`Universe: ${selected?.name}`}>
+        <span style={{ fontSize: '1.2rem' }}>{getMarketIcon(selected?.market)}</span>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ position: 'relative' }} onClick={e => e.stopPropagation()}>
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        style={{
+          ...S.select,
+          width: '100%',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          cursor: 'pointer',
+          textAlign: 'left'
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
+          <span style={{ fontSize: '1.2rem' }}>{getMarketIcon(selected?.market)}</span>
+          <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <span style={{ fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{selected?.name || 'Select Universe'}</span>
+            <span style={{ fontSize: '10px', color: 'var(--muted-foreground)' }}>{selected?.count || 0} companies</span>
+          </div>
+        </div>
+        <span style={{ fontSize: '0.7rem', color: 'var(--muted-foreground)' }}>▼</span>
+      </button>
+
+      {isOpen && (
+        <div style={{
+          position: 'absolute',
+          top: '100%',
+          left: 0,
+          width: '300px',
+          maxHeight: '400px',
+          overflowY: 'auto',
+          background: 'var(--card)',
+          color: 'var(--card-foreground)',
+          border: '3px solid var(--border)',
+          borderRadius: '0',
+          boxShadow: '4px 4px 0 var(--border)',
+          marginTop: '5px',
+          zIndex: 50,
+          padding: '8px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '4px'
+        }}>
+          <div style={{ padding: '8px 12px', fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>Built-in Universes</div>
+          {universes.map(u => (
+            <div
+              key={u.id}
+              onClick={() => { onChange(u.id); setIsOpen(false); }}
+              style={{
+                padding: '10px',
+                borderRadius: 'var(--radius)',
+                cursor: 'pointer',
+                background: u.id === current ? 'var(--muted)' : 'transparent',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                transition: 'background 0.2s',
+                border: u.id === current ? '1px solid var(--primary)' : '1px solid transparent'
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = 'var(--muted)'}
+              onMouseLeave={e => e.currentTarget.style.background = u.id === current ? 'var(--muted)' : 'transparent'}
+            >
+              <div style={{ fontSize: '1.5rem' }}>{getMarketIcon(u.market)}</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: '600', fontSize: '0.9rem' }}>{u.name}</div>
+                <div style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)' }}>
+                  <span style={{ color: 'var(--primary)', fontWeight: 'bold' }}>{u.count}</span> companies
+                </div>
+              </div>
+              {u.id === current && <div style={{ marginLeft: 'auto', color: 'var(--primary)' }}>✓</div>}
+            </div>
+          ))}
+
+          {customUniverses.length > 0 && (
+            <>
+              <div style={{ padding: '8px 12px', fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--muted-foreground)', textTransform: 'uppercase', marginTop: '8px' }}>Custom Universes</div>
+              {customUniverses.map(u => (
+                <div
+                  key={u.id}
+                  onClick={() => { onChange(u.id); setIsOpen(false); }}
+                  style={{
+                    padding: '10px',
+                    borderRadius: 'var(--radius)',
+                    cursor: 'pointer',
+                    background: u.id === current ? 'var(--muted)' : 'transparent',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    transition: 'background 0.2s',
+                    border: u.id === current ? '1px solid var(--primary)' : '1px solid transparent'
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--muted)'}
+                  onMouseLeave={e => e.currentTarget.style.background = u.id === current ? 'var(--muted)' : 'transparent'}
+                >
+                  <div style={{ fontSize: '1.5rem' }}>{getMarketIcon(u.market)}</div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: '600', fontSize: '0.9rem' }}>{u.name}</div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)' }}>
+                      <span style={{ color: 'var(--primary)', fontWeight: 'bold' }}>{u.count}</span> companies
+                    </div>
+                  </div>
+                  {u.id === current && <div style={{ marginLeft: 'auto', color: 'var(--primary)' }}>✓</div>}
+                </div>
+              ))}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+interface AnalysisCheckpoint {
+  label: string;
+  status: 'pass' | 'fail' | 'neutral';
+  value: string;
+}
+
+interface AnalysisMetrics {
+  market_cap?: number;
+  pe_ratio?: number;
+  pb_ratio?: number;
+  roe?: number;
+  profit_margin?: number;
+  revenue_growth?: number;
+  earnings_growth?: number;
+  // New Metrics
+  total_debt?: number;
+  debt_to_equity?: number;
+  current_ratio?: number;
+  free_cash_flow?: number;
+  operating_cash_flow?: number;
+  forward_pe?: number;
+  peg_ratio?: number;
+  target_mean_price?: number;
+  recommendation_key?: string;
+  num_analysts?: number;
+}
+
+
+interface AnalysisTechnicals {
+  rsi?: number;
+  macd?: number;
+  macd_signal?: number;
+  sma_200?: number;
+  return_1y?: number;
+  close?: number;
+}
+
+interface AnalysisData {
+  ticker: string;
+  name: string;
+  price: number;
+  currency: string;
+  score: number;
+  recommendation: string;
+  summary: string;
+  metrics: AnalysisMetrics;
+  technicals: AnalysisTechnicals;
+  checkpoints: AnalysisCheckpoint[];
+}
+
+const StockAnalyzer = () => {
+  const [ticker, setTicker] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [data, setData] = useState<AnalysisData | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const analyze = async () => {
+    if (!ticker) return;
+    setLoading(true);
+    setError(null);
+    setData(null);
+    try {
+      const r = await fetch(`${API_URL}/api/analysis/${ticker}`);
+      if (r.ok) {
+        const d: AnalysisData = await r.json();
+        setData(d);
+      } else {
+        const e = await r.json();
+        setError(e.detail || 'Failed to fetch analysis');
+      }
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('Connection error');
+      }
+    }
+    setLoading(false);
+  };
+
+  const downloadPdf = () => {
+    if (!data) return;
+    window.open(`${API_URL}/api/analysis/${data.ticker}/pdf`, '_blank');
+  };
+
+
+  const getScoreColor = (score: number) => {
+    if (score >= 80) return '#22c55e'; // Green
+    if (score >= 60) return '#3b82f6'; // Blue
+    if (score >= 40) return '#f59e0b'; // Orange
+    return '#ef4444'; // Red
+  };
+
+  return (
+    <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
+      <div style={S.card}>
+        <h2 style={{ marginTop: 0 }}>🔍 Stock Analyzer</h2>
+        <p style={{ color: 'var(--muted-foreground)' }}>Get a comprehensive automated analysis of any stock (US or Thai).</p>
+
+        <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+          <input
+            style={{ ...S.input, marginBottom: 0, flex: 1, fontSize: '1.2rem', padding: '10px' }}
+            placeholder="Enter Ticker (e.g., AAPL, DELTA.BK)"
+            value={ticker}
+            onChange={e => setTicker(e.target.value.toUpperCase())}
+            onKeyDown={e => e.key === 'Enter' && analyze()}
+          />
+          <button style={{ ...S.btn('primary'), fontSize: '1.2rem', padding: '10px 20px' }} onClick={analyze} disabled={loading}>
+            {loading ? 'Analyzing...' : 'Analyze'}
+          </button>
+        </div>
+
+        {error && (
+          <div style={{ padding: '15px', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', borderRadius: 'var(--radius)', marginBottom: '20px' }}>
+            ⚠️ {error}
+          </div>
+        )}
+
+        {data && (
+          <div>
+            {/* Header: Name, Price, Score */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px', flexWrap: 'wrap', gap: '20px' }}>
+              <div>
+                <h1 style={{ margin: 0, fontSize: '2.5rem' }}>{data.ticker}</h1>
+                <div style={{ color: 'var(--muted-foreground)', fontSize: '1.2rem' }}>{data.name}</div>
+                <div style={{ fontSize: '2rem', fontWeight: 'bold', marginTop: '10px' }}>
+                  {data.price.toLocaleString()} <span style={{ fontSize: '1rem', color: 'var(--muted-foreground)' }}>{data.currency}</span>
+                </div>
+              </div>
+
+              {/* Score Gauge */}
+              <div style={{ textAlign: 'center', position: 'relative', width: '150px', height: '150px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--muted)', borderRadius: '50%' }}>
+                <div style={{ position: 'absolute', width: '130px', height: '130px', borderRadius: '50%', border: `10px solid ${getScoreColor(data.score)}`, borderTopColor: 'transparent', transform: 'rotate(-45deg)', transition: 'all 1s ease' }}></div>
+                <div style={{ zIndex: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{ fontSize: '3rem', fontWeight: 'bold', color: getScoreColor(data.score), lineHeight: 1 }}>{data.score}</div>
+                  <div style={{ fontSize: '0.8rem', fontWeight: 'bold', textTransform: 'uppercase' }}>Quant Score</div>
+                </div>
+              </div>
+
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: getScoreColor(data.score) }}>{data.recommendation}</div>
+                <div style={{ maxWidth: '300px', fontSize: '0.9rem', color: 'var(--muted-foreground)', marginTop: '5px' }}>
+                  {data.summary}
+                </div>
+                <button
+                  onClick={downloadPdf}
+                  style={{ ...S.btn('primary'), marginTop: '10px' }}
+                >
+                  ⬇️ DOWNLOAD PDF
+                </button>
+              </div>
+            </div>
+
+            {/* Checkpoints */}
+            <h3 style={{ borderBottom: '1px solid var(--border)', paddingBottom: '10px' }}>✅ Analysis Checkpoints</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '15px', marginBottom: '30px' }}>
+              {data.checkpoints.map((cp: AnalysisCheckpoint, i: number) => (
+                <div key={i} style={{
+                  padding: '12px',
+                  borderRadius: 'var(--radius)',
+                  background: 'var(--muted)',
+                  borderLeft: `5px solid ${cp.status === 'pass' ? '#22c55e' : cp.status === 'fail' ? '#ef4444' : '#f59e0b'}`
+                }}>
+                  <div style={{ fontSize: '0.9rem', fontWeight: 'bold' }}>{cp.label}</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '5px' }}>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)' }}>Status</span>
+                    <span style={{ fontWeight: 'bold', color: cp.status === 'pass' ? '#22c55e' : cp.status === 'fail' ? '#ef4444' : '#f59e0b' }}>
+                      {cp.value}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Fundamentals & Technicals Grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+              <div>
+                <h3 style={{ borderBottom: '1px solid var(--border)', paddingBottom: '10px' }}>💰 Key Fundamentals</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                  <table style={{ width: '100%', fontSize: '0.9rem', borderCollapse: 'collapse' }}>
+                    <thead><tr><th colSpan={2} style={{ textAlign: 'left', paddingBottom: '5px', color: 'var(--primary)' }}>Valuation & Growth</th></tr></thead>
+                    <tbody>
+                      <tr><td style={{ padding: '4px 0', color: 'var(--muted-foreground)' }}>Market Cap</td><td style={{ textAlign: 'right', fontWeight: 'bold' }}>{data.metrics.market_cap ? (data.metrics.market_cap / 1e9).toFixed(2) + 'B' : '-'}</td></tr>
+                      <tr><td style={{ padding: '4px 0', color: 'var(--muted-foreground)' }}>P/E Ratio</td><td style={{ textAlign: 'right', fontWeight: 'bold' }}>{data.metrics.pe_ratio?.toFixed(2) || '-'}</td></tr>
+                      <tr><td style={{ padding: '4px 0', color: 'var(--muted-foreground)' }}>Forward P/E</td><td style={{ textAlign: 'right', fontWeight: 'bold' }}>{data.metrics.forward_pe?.toFixed(2) || '-'}</td></tr>
+                      <tr><td style={{ padding: '4px 0', color: 'var(--muted-foreground)' }}>PEG Ratio</td><td style={{ textAlign: 'right', fontWeight: 'bold' }}>{data.metrics.peg_ratio?.toFixed(2) || '-'}</td></tr>
+                      <tr><td style={{ padding: '4px 0', color: 'var(--muted-foreground)' }}>Rev. Growth</td><td style={{ textAlign: 'right', fontWeight: 'bold' }}>{data.metrics.revenue_growth ? (data.metrics.revenue_growth * 100).toFixed(2) + '%' : '-'}</td></tr>
+                    </tbody>
+                  </table>
+
+                  <table style={{ width: '100%', fontSize: '0.9rem', borderCollapse: 'collapse' }}>
+                    <thead><tr><th colSpan={2} style={{ textAlign: 'left', paddingBottom: '5px', color: 'var(--primary)' }}>Financial Health</th></tr></thead>
+                    <tbody>
+                      <tr><td style={{ padding: '4px 0', color: 'var(--muted-foreground)' }}>Total Debt</td><td style={{ textAlign: 'right', fontWeight: 'bold' }}>{data.metrics.total_debt ? (data.metrics.total_debt / 1e9).toFixed(2) + 'B' : '-'}</td></tr>
+                      <tr><td style={{ padding: '4px 0', color: 'var(--muted-foreground)' }}>Debt/Equity</td><td style={{ textAlign: 'right', fontWeight: 'bold' }}>{data.metrics.debt_to_equity?.toFixed(2) || '-'}</td></tr>
+                      <tr><td style={{ padding: '4px 0', color: 'var(--muted-foreground)' }}>Current Ratio</td><td style={{ textAlign: 'right', fontWeight: 'bold' }}>{data.metrics.current_ratio?.toFixed(2) || '-'}</td></tr>
+                      <tr><td style={{ padding: '4px 0', color: 'var(--muted-foreground)' }}>Free Cash Flow</td><td style={{ textAlign: 'right', fontWeight: 'bold' }}>{data.metrics.free_cash_flow ? (data.metrics.free_cash_flow / 1e9).toFixed(2) + 'B' : '-'}</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div>
+                <h3 style={{ borderBottom: '1px solid var(--border)', paddingBottom: '10px' }}>📈 Technical Indicators</h3>
+                <table style={{ width: '100%', fontSize: '0.9rem', borderCollapse: 'collapse' }}>
+                  <tbody>
+                    <tr><td style={{ padding: '8px 0', color: 'var(--muted-foreground)' }}>RSI (14)</td><td style={{ textAlign: 'right', fontWeight: 'bold' }}>{data.technicals.rsi?.toFixed(2) || '-'}</td></tr>
+                    <tr><td style={{ padding: '8px 0', color: 'var(--muted-foreground)' }}>MACD</td><td style={{ textAlign: 'right', fontWeight: 'bold' }}>{data.technicals.macd?.toFixed(2) || '-'}</td></tr>
+                    <tr><td style={{ padding: '8px 0', color: 'var(--muted-foreground)' }}>SMA 200</td><td style={{ textAlign: 'right', fontWeight: 'bold' }}>{data.technicals.sma_200?.toFixed(2) || '-'}</td></tr>
+                    <tr><td style={{ padding: '8px 0', color: 'var(--muted-foreground)' }}>1Y Return</td><td style={{ textAlign: 'right', fontWeight: 'bold', color: (data.technicals.return_1y || 0) >= 0 ? '#22c55e' : '#ef4444' }}>{data.technicals.return_1y?.toFixed(2)}%</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default function Home() {
+  const [tab, setTab] = useState<'models' | 'advanced' | 'backtest' | 'universe' | 'model-detail' | 'history' | 'status' | 'settings' | 'analysis' | 'screening'>('models');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [modelSubTab, setModelSubTab] = useState<'all' | 'technical' | 'fundamental' | 'quantitative'>('all');
+  const [advancedSubTab, setAdvancedSubTab] = useState<'combiner' | 'enhanced-combiner' | 'sector' | 'regime' | 'validation' | 'scheduled'>('combiner');
+  const [models, setModels] = useState<Model[]>([]);
+  const [results, setResults] = useState<Record<string, ModelResult>>({});
+  const [running, setRunning] = useState<string | null>(null);
+  const [universe, setUniverse] = useState('sp50');
+  const [topN, setTopN] = useState(10); // Number of top signals to show
+  const [universes, setUniverses] = useState<any[]>([]);
+  const [customUniverses, setCustomUniverses] = useState<any[]>([]);
+  const [connected, setConnected] = useState(false);
+  const [logs, setLogs] = useState<Log[]>([]);
+  const [history, setHistory] = useState<any[]>([]);
+  const [modelDocs, setModelDocs] = useState<Record<string, any>>({});
+  const [selDoc, setSelDoc] = useState<string | null>(null);
+  const [newUni, setNewUni] = useState({ name: '', desc: '', tickers: '', market: 'US' });
+
+  // Backtesting state (VectorBT)
+  const [backtestModel, setBacktestModel] = useState<string>('');
+  const [backtestUniverse, setBacktestUniverse] = useState('sp50');
+  const [backtestCapital, setBacktestCapital] = useState(100000);
+  const [backtestHoldingPeriod, setBacktestHoldingPeriod] = useState(21);
+  const [backtestTopN, setBacktestTopN] = useState(10);
+  const [backtestRunning, setBacktestRunning] = useState(false);
+  const [backtestResults, setBacktestResults] = useState<BacktestResult | null>(null);
+  const [backtestPositionSize, setBacktestPositionSize] = useState('equal');
+  const [backtestMaxPositions, setBacktestMaxPositions] = useState(20);
+
+  // Risk Management state
+  const [stopLoss, setStopLoss] = useState<number | null>(null);
+  const [takeProfit, setTakeProfit] = useState<number | null>(null);
+  const [rebalanceFreq, setRebalanceFreq] = useState('monthly');
+  const [useVectorBT, setUseVectorBT] = useState(true); // Use advanced backtester
+
+  // Advanced Backtesting state
+  const [tearsheetData, setTearsheetData] = useState<any>(null);
+  const [tearsheetLoading, setTearsheetLoading] = useState(false);
+  const [walkForwardResults, setWalkForwardResults] = useState<any>(null);
+  const [walkForwardLoading, setWalkForwardLoading] = useState(false);
+  const [monteCarloResults, setMonteCarloResults] = useState<any>(null);
+  const [monteCarloLoading, setMonteCarloLoading] = useState(false);
+  const [optimizationResults, setOptimizationResults] = useState<any>(null);
+  const [optimizationLoading, setOptimizationLoading] = useState(false);
+  const [backtestCapabilities, setBacktestCapabilities] = useState<any>(null);
+
+  // Model Comparison state
+  const [compareModels, setCompareModels] = useState<string[]>([]);
+  const [comparisonResults, setComparisonResults] = useState<BacktestResult[]>([]);
+  const [comparisonRunning, setComparisonRunning] = useState(false);
+
+  // Saved Configurations state
+  const [savedConfigs, setSavedConfigs] = useState<Array<{ name: string; config: any }>>([]);
+  const [configName, setConfigName] = useState('');
+
+  // Trailing Stop state
+  const [trailingStop, setTrailingStop] = useState<number | null>(null);
+
+  // Optimization Parameters state
+  const [optimizationMetric, setOptimizationMetric] = useState('sharpe_ratio');
+  const [optimizationParamGrid, setOptimizationParamGrid] = useState('{}');
+
+  // Advanced features state
+  const [signalCombinerUniverse, setSignalCombinerUniverse] = useState('sp50');
+  const [signalCombinerMinConf, setSignalCombinerMinConf] = useState(3);
+  const [signalCombinerCategory, setSignalCombinerCategory] = useState<string>('');
+  const [signalCombinerRunning, setSignalCombinerRunning] = useState(false);
+  const [signalCombinerResults, setSignalCombinerResults] = useState<any>(null);
+
+  const [sectorRotationUniverse, setSectorRotationUniverse] = useState('sp500');
+  const [sectorRotationRunning, setSectorRotationRunning] = useState(false);
+  const [sectorRotationResults, setSectorRotationResults] = useState<any>(null);
+
+  // Market Regime state
+  const [marketRegimeIndex, setMarketRegimeIndex] = useState('SPY');
+  const [marketRegimeUniverse, setMarketRegimeUniverse] = useState('sp50');
+  const [marketRegimeRunning, setMarketRegimeRunning] = useState(false);
+  const [marketRegimeResults, setMarketRegimeResults] = useState<any>(null);
+
+  // Enhanced Signal Combiner state
+  const [enhancedCombinerUniverse, setEnhancedCombinerUniverse] = useState('sp50');
+  const [enhancedCombinerModels, setEnhancedCombinerModels] = useState<string[]>([]);
+  const [enhancedCombinerMethod, setEnhancedCombinerMethod] = useState('weighted');
+  const [enhancedCombinerMinModels, setEnhancedCombinerMinModels] = useState(2);
+  const [enhancedCombinerRunning, setEnhancedCombinerRunning] = useState(false);
+  const [enhancedCombinerResults, setEnhancedCombinerResults] = useState<any>(null);
+  const [availableModelsForCombiner, setAvailableModelsForCombiner] = useState<any>(null);
+
+  // Model Validation state
+  const [validationModel, setValidationModel] = useState('');
+  const [validationUniverse, setValidationUniverse] = useState('sp50');
+  const [validationHoldingPeriod, setValidationHoldingPeriod] = useState(21);
+  const [validationRunning, setValidationRunning] = useState(false);
+  const [validationResults, setValidationResults] = useState<any>(null);
+  const [validationAllRunning, setValidationAllRunning] = useState(false);
+  const [validationAllResults, setValidationAllResults] = useState<any>(null);
+
+  // Scheduled Scans state
+  const [scheduledScans, setScheduledScans] = useState<any[]>([]);
+  const [newScanModel, setNewScanModel] = useState('');
+  const [newScanUniverse, setNewScanUniverse] = useState('sp50');
+  const [newScanTime, setNewScanTime] = useState('09:30');
+  const [newScanDays, setNewScanDays] = useState<string[]>(['Mon', 'Tue', 'Wed', 'Thu', 'Fri']);
+
+  // Universe details state
+  const [selectedUniverseId, setSelectedUniverseId] = useState<string | null>(null);
+  const [universeDetails, setUniverseDetails] = useState<any>(null);
+  const [universeStocks, setUniverseStocks] = useState<any[]>([]);
+  const [selectedStock, setSelectedStock] = useState<string | null>(null);
+  const [stockDetails, setStockDetails] = useState<any>(null);
+
+  // Custom universe edit state
+  const [editingUniverse, setEditingUniverse] = useState<any>(null);
+  const [parsePreview, setParsePreview] = useState<any>(null);
+
+  const log = (t: Log['type'], m: string) => setLogs(p => [...p.slice(-99), { time: new Date().toLocaleTimeString(), type: t, message: m }]);
+
+  const checkConn = async () => {
+    try { const r = await fetch(`${API_URL}/api/status/test-connection`); if (r.ok) { setConnected(true); log('success', 'Connected'); return true; } } catch (e) { log('error', `Connection failed: ${e}`); }
+    setConnected(false); return false;
+  };
+
+  const loadAll = async () => {
+    try { const r = await fetch(`${API_URL}/api/models/`); if (r.ok) { const d = await r.json(); setModels(d.models); log('success', `Loaded ${d.models.length} models`); } } catch (e) { log('error', `${e}`); }
+    try { const r = await fetch(`${API_URL}/api/universe/`); if (r.ok) { const d = await r.json(); setUniverses(d.universes); } } catch (e) { }
+    try { const r = await fetch(`${API_URL}/api/custom-universe/`); if (r.ok) { const d = await r.json(); setCustomUniverses(d.universes); } } catch (e) { }
+    try { const r = await fetch(`${API_URL}/api/models/docs`); if (r.ok) { const d = await r.json(); setModelDocs(d); } } catch (e) { }
+    try {
+      const r = await fetch(`${API_URL}/api/models/history`);
+      if (r.ok) {
+        const d = await r.json();
+        setHistory(d.runs || []);
+        if (d.runs && d.runs.length > 0) {
+          log('info', `Loaded ${d.runs.length} history records`);
+        }
+      } else {
+        const errorText = await r.text();
+        log('error', `Failed to load history: ${r.status} ${errorText}`);
+      }
+    } catch (e: any) {
+      log('error', `Failed to load history: ${e.message || e}`);
+    }
+  };
+
+  const runModel = async (id: string) => {
+    setRunning(id); log('info', `Running ${id}...`);
+    try {
+      const r = await fetch(`${API_URL}/api/models/run`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model_id: id, universe, top_n: topN }) });
+      if (r.ok) { const d = await r.json(); setResults(p => ({ ...p, [id]: d })); log('success', `${d.model_name}: ${d.buy_signals.length} buy, ${d.sell_signals.length} sell (showing top ${topN})`); loadAll(); }
+      else { const e = await r.json(); log('error', e.detail); }
+    } catch (e) { log('error', `${e}`); }
+    setRunning(null);
+  };
+
+  const runModelWithParams = async (id: string, params: Record<string, any>) => {
+    setRunning(id); log('info', `Running ${id} with custom parameters...`);
+    try {
+      const r = await fetch(`${API_URL}/api/models/run`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model_id: id, universe, top_n: topN, parameters: params })
+      });
+      if (r.ok) {
+        const d = await r.json();
+        setResults(p => ({ ...p, [id]: d }));
+        log('success', `${d.model_name}: ${d.buy_signals.length} buy, ${d.sell_signals.length} sell (custom params)`);
+        loadAll();
+      }
+      else { const e = await r.json(); log('error', e.detail); }
+    } catch (e) { log('error', `${e}`); }
+    setRunning(null);
+  };
+
+  const runBacktest = async () => {
+    if (!backtestModel) { log('error', 'Please select a model'); return; }
+    setBacktestRunning(true);
+    setTearsheetData(null); // Clear previous tearsheet
+
+    // Use VectorBT backtester for advanced features
+    const endpoint = useVectorBT ? `${API_URL}/api/backtest/run` : `${API_URL}/api/advanced/backtest`;
+    log('info', `Running ${useVectorBT ? 'advanced' : 'simple'} backtest for ${backtestModel}...`);
+
+    try {
+      const requestBody = useVectorBT ? {
+        model_id: backtestModel,
+        universe: backtestUniverse,
+        initial_capital: backtestCapital,
+        max_positions: backtestMaxPositions,
+        position_size: backtestPositionSize,
+        stop_loss: stopLoss,
+        take_profit: takeProfit,
+        rebalance_freq: rebalanceFreq
+      } : {
+        model_id: backtestModel,
+        universe: backtestUniverse,
+        initial_capital: backtestCapital,
+        holding_period: backtestHoldingPeriod,
+        top_n: backtestTopN
+      };
+
+      const r = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody)
+      });
+
+      if (r.ok) {
+        const d = await r.json();
+        setBacktestResults(d);
+
+        // Format success message based on response structure
+        if (useVectorBT) {
+          log('success', `Backtest complete: ${(d.total_return * 100).toFixed(2)}% return, Sharpe: ${d.sharpe_ratio?.toFixed(2) || 'N/A'}`);
+        } else {
+          log('success', `Backtest complete: ${d.performance?.total_return_pct?.toFixed(2) || 0}% return, ${d.trades?.win_rate_pct?.toFixed(1) || 0}% win rate`);
+        }
+      } else {
+        const e = await r.json();
+        log('error', `Backtest failed: ${e.detail || r.statusText}`);
+      }
+    } catch (e) {
+      log('error', `Backtest error: ${e}`);
+    }
+    setBacktestRunning(false);
+  };
+
+  // Run Monte Carlo simulation
+  const runMonteCarlo = async () => {
+    if (!backtestModel) { log('error', 'Please select a model first'); return; }
+    setMonteCarloLoading(true);
+    log('info', `Running Monte Carlo simulation for ${backtestModel}...`);
+    try {
+      const r = await fetch(`${API_URL}/api/backtest/monte-carlo`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model_id: backtestModel,
+          universe: backtestUniverse,
+          n_simulations: 1000,
+          time_horizon: 252
+        })
+      });
+      if (r.ok) {
+        const d = await r.json();
+        setMonteCarloResults(d);
+        log('success', `Monte Carlo: ${(d.probability_of_profit * 100).toFixed(1)}% probability of profit, VaR: ${(d.var_95 * 100).toFixed(2)}%`);
+      } else {
+        const e = await r.json();
+        log('error', `Monte Carlo failed: ${e.detail || r.statusText}`);
+      }
+    } catch (e: any) {
+      log('error', `Monte Carlo error: ${e.message || e}`);
+    }
+    setMonteCarloLoading(false);
+  };
+
+  // Run Walk-Forward Analysis
+  const runWalkForward = async () => {
+    if (!backtestModel) { log('error', 'Please select a model first'); return; }
+    setWalkForwardLoading(true);
+    log('info', `Running walk-forward analysis for ${backtestModel}...`);
+    try {
+      const r = await fetch(`${API_URL}/api/backtest/walk-forward`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model_id: backtestModel,
+          universe: backtestUniverse,
+          in_sample_pct: 0.7,
+          n_splits: 5
+        })
+      });
+      if (r.ok) {
+        const d = await r.json();
+        setWalkForwardResults(d);
+        log('success', `Walk-Forward: Robustness score ${(d.robustness_score * 100).toFixed(1)}%`);
+      } else {
+        const e = await r.json();
+        log('error', `Walk-Forward failed: ${e.detail || r.statusText}`);
+      }
+    } catch (e: any) {
+      log('error', `Walk-Forward error: ${e.message || e}`);
+    }
+    setWalkForwardLoading(false);
+  };
+
+  // Run Model Comparison - backtest multiple models
+  const runModelComparison = async () => {
+    if (compareModels.length < 2) { log('error', 'Select at least 2 models to compare'); return; }
+    setComparisonRunning(true);
+    setComparisonResults([]);
+    log('info', `Comparing ${compareModels.length} models...`);
+
+    const results: BacktestResult[] = [];
+    for (const modelId of compareModels) {
+      try {
+        const r = await fetch(`${API_URL}/api/backtest/run`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model_id: modelId,
+            universe: backtestUniverse,
+            initial_capital: backtestCapital,
+            max_positions: backtestMaxPositions,
+            position_size: backtestPositionSize,
+            stop_loss: stopLoss,
+            take_profit: takeProfit,
+            rebalance_freq: rebalanceFreq
+          })
+        });
+        if (r.ok) {
+          const d = await r.json();
+          results.push({ ...d, model_name: modelId });
+        }
+      } catch (e) {
+        log('error', `Failed to backtest ${modelId}`);
+      }
+    }
+    setComparisonResults(results);
+    log('success', `Compared ${results.length} models`);
+    setComparisonRunning(false);
+  };
+
+  // Run Parameter Optimization
+  const runOptimization = async () => {
+    if (!backtestModel) { log('error', 'Please select a model first'); return; }
+
+    let paramGrid: Record<string, any[]>;
+    try {
+      paramGrid = JSON.parse(optimizationParamGrid);
+      if (Object.keys(paramGrid).length === 0) {
+        log('error', 'Please enter parameter grid (e.g., {"threshold": [0.5, 0.6, 0.7]})');
+        return;
+      }
+    } catch {
+      log('error', 'Invalid JSON for parameter grid');
+      return;
+    }
+
+    setOptimizationLoading(true);
+    log('info', `Running parameter optimization for ${backtestModel}...`);
+    try {
+      const r = await fetch(`${API_URL}/api/backtest/optimize`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model_id: backtestModel,
+          universe: backtestUniverse,
+          param_grid: paramGrid,
+          metric: optimizationMetric
+        })
+      });
+      if (r.ok) {
+        const d = await r.json();
+        setOptimizationResults(d);
+        log('success', `Optimization complete: Best Sharpe ${d.best_sharpe?.toFixed(2)}, Best Return ${d.best_return?.toFixed(2)}%`);
+      } else {
+        const e = await r.json();
+        log('error', `Optimization failed: ${e.detail || r.statusText}`);
+      }
+    } catch (e: any) {
+      log('error', `Optimization error: ${e.message || e}`);
+    }
+    setOptimizationLoading(false);
+  };
+
+  // Save current configuration
+  const saveConfig = () => {
+    if (!configName.trim()) { log('error', 'Please enter a config name'); return; }
+    const config = {
+      model: backtestModel,
+      universe: backtestUniverse,
+      capital: backtestCapital,
+      maxPositions: backtestMaxPositions,
+      positionSize: backtestPositionSize,
+      stopLoss,
+      takeProfit,
+      trailingStop,
+      rebalanceFreq,
+      useVectorBT
+    };
+    const newConfigs = [...savedConfigs, { name: configName, config }];
+    setSavedConfigs(newConfigs);
+    localStorage.setItem('backtestConfigs', JSON.stringify(newConfigs));
+    setConfigName('');
+    log('success', `Configuration "${configName}" saved`);
+  };
+
+  // Load a saved configuration
+  const loadConfig = (config: any) => {
+    if (config.model) setBacktestModel(config.model);
+    if (config.universe) setBacktestUniverse(config.universe);
+    if (config.capital) setBacktestCapital(config.capital);
+    if (config.maxPositions) setBacktestMaxPositions(config.maxPositions);
+    if (config.positionSize) setBacktestPositionSize(config.positionSize);
+    setStopLoss(config.stopLoss ?? null);
+    setTakeProfit(config.takeProfit ?? null);
+    setTrailingStop(config.trailingStop ?? null);
+    if (config.rebalanceFreq) setRebalanceFreq(config.rebalanceFreq);
+    if (config.useVectorBT !== undefined) setUseVectorBT(config.useVectorBT);
+    log('success', 'Configuration loaded');
+  };
+
+  // Delete a saved configuration
+  const deleteConfig = (name: string) => {
+    const newConfigs = savedConfigs.filter(c => c.name !== name);
+    setSavedConfigs(newConfigs);
+    localStorage.setItem('backtestConfigs', JSON.stringify(newConfigs));
+    log('info', `Configuration "${name}" deleted`);
+  };
+
+  // Load saved configs from localStorage on mount
+  useEffect(() => {
+    const stored = localStorage.getItem('backtestConfigs');
+    if (stored) {
+      try {
+        setSavedConfigs(JSON.parse(stored));
+      } catch { /* ignore */ }
+    }
+  }, []);
+
+  const downloadBacktestPDF = async (result: BacktestResult) => {
+    try {
+      log('info', 'Generating PDF...');
+      const r = await fetch(`${API_URL}/api/advanced/backtest/export-pdf`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(result)
+      });
+      if (r.ok) {
+        const contentType = r.headers.get('content-type');
+        if (contentType && contentType.includes('application/pdf')) {
+          const contentDisposition = r.headers.get('content-disposition');
+          let filename = 'backtest.pdf';
+          if (contentDisposition) {
+            const match = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+            if (match && match[1]) {
+              filename = match[1].replace(/['"]/g, '');
+            }
+          }
+          const b = await r.blob();
+          const u = URL.createObjectURL(b);
+          const a = document.createElement('a');
+          a.href = u;
+          a.download = filename;
+          a.click();
+          URL.revokeObjectURL(u);
+          log('success', `PDF downloaded: ${filename}`);
+        } else {
+          const errorText = await r.text();
+          log('error', `Expected PDF but got: ${errorText.substring(0, 100)}`);
+        }
+      } else {
+        const errorData = await r.json().catch(() => ({ detail: r.statusText }));
+        log('error', `PDF download failed: ${errorData.detail || r.statusText}`);
+      }
+    } catch (e) {
+      log('error', `PDF download error: ${e}`);
+    }
+  };
+
+  const runSignalCombiner = async () => {
+    setSignalCombinerRunning(true);
+    log('info', 'Running signal combiner...');
+    try {
+      const body: any = {
+        universe: signalCombinerUniverse,
+        min_confirmation: signalCombinerMinConf
+      };
+      if (signalCombinerCategory) {
+        body.category = signalCombinerCategory;
+      }
+
+      const r = await fetch(`${API_URL}/api/advanced/signal-combiner`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      if (r.ok) {
+        const d = await r.json();
+        setSignalCombinerResults(d);
+        log('success', `Signal combiner: ${d.strong_buy_signals?.length || 0} strong buys, ${d.strong_sell_signals?.length || 0} strong sells`);
+      } else {
+        const e = await r.json();
+        log('error', `Signal combiner failed: ${e.detail || r.statusText}`);
+      }
+    } catch (e) {
+      log('error', `Signal combiner error: ${e}`);
+    }
+    setSignalCombinerRunning(false);
+  };
+
+  const runSectorRotation = async () => {
+    setSectorRotationRunning(true);
+    log('info', 'Analyzing sector rotation...');
+    try {
+      const r = await fetch(`${API_URL}/api/advanced/sector-rotation?universe=${sectorRotationUniverse}`);
+      if (r.ok) {
+        const d = await r.json();
+        setSectorRotationResults(d);
+        log('success', `Sector rotation: ${d.rotation_recommendation?.summary || 'Analysis complete'}`);
+      } else {
+        const e = await r.json();
+        log('error', `Sector rotation failed: ${e.detail || r.statusText}`);
+      }
+    } catch (e) {
+      log('error', `Sector rotation error: ${e}`);
+    }
+    setSectorRotationRunning(false);
+  };
+
+  const runMarketRegime = async () => {
+    setMarketRegimeRunning(true);
+    log('info', 'Detecting market regime...');
+    try {
+      const r = await fetch(`${API_URL}/api/advanced/market-regime?index=${marketRegimeIndex}&universe=${marketRegimeUniverse}`);
+      if (r.ok) {
+        const d = await r.json();
+        setMarketRegimeResults(d);
+        log('success', `Market Regime: ${d.regime} - ${d.recommendation || 'Analysis complete'}`);
+      } else {
+        const e = await r.json();
+        log('error', `Market regime failed: ${e.detail || r.statusText}`);
+      }
+    } catch (e) {
+      log('error', `Market regime error: ${e}`);
+    }
+    setMarketRegimeRunning(false);
+  };
+
+  // Enhanced Signal Combiner functions
+  const loadAvailableModels = async () => {
+    try {
+      const r = await fetch(`${API_URL}/api/enhanced/models/available`);
+      if (r.ok) {
+        const d = await r.json();
+        setAvailableModelsForCombiner(d);
+      }
+    } catch (e) { /* ignore */ }
+  };
+
+  const runEnhancedCombiner = async () => {
+    setEnhancedCombinerRunning(true);
+    log('info', 'Running enhanced signal combiner...');
+    try {
+      const body: any = {
+        universe: enhancedCombinerUniverse,
+        combine_method: enhancedCombinerMethod,
+        min_models: enhancedCombinerMinModels,
+        min_confidence: 40,
+        include_context: true,
+        top_n: 20
+      };
+      if (enhancedCombinerModels.length > 0) {
+        body.models = enhancedCombinerModels;
+      }
+      const r = await fetch(`${API_URL}/api/enhanced/combine-signals`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      if (r.ok) {
+        const d = await r.json();
+        setEnhancedCombinerResults(d);
+        log('success', `Combined ${d.models_used} models: ${d.buy_count} buy, ${d.sell_count} sell signals`);
+      } else {
+        const e = await r.json();
+        log('error', `Enhanced combiner failed: ${e.detail || r.statusText}`);
+      }
+    } catch (e) {
+      log('error', `Enhanced combiner error: ${e}`);
+    }
+    setEnhancedCombinerRunning(false);
+  };
+
+  const downloadEnhancedPDF = async (modelId: string) => {
+    try {
+      log('info', `Generating enhanced PDF for ${modelId}...`);
+      const r = await fetch(`${API_URL}/api/enhanced/export-pdf`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model_id: modelId, universe, top_n: topN, include_context: true })
+      });
+      if (r.ok) {
+        const b = await r.blob();
+        const u = URL.createObjectURL(b);
+        const a = document.createElement('a');
+        a.href = u;
+        a.download = `${modelId}_enhanced_report.pdf`;
+        a.click();
+        URL.revokeObjectURL(u);
+        log('success', 'Enhanced PDF downloaded');
+      } else {
+        log('error', 'Failed to generate enhanced PDF');
+      }
+    } catch (e) {
+      log('error', `Enhanced PDF error: ${e}`);
+    }
+  };
+
+  // Download PDF for Enhanced Combiner results
+  const downloadEnhancedCombinerPDF = async () => {
+    if (!enhancedCombinerResults) { log('error', 'No results to export'); return; }
+    try {
+      log('info', 'Generating Enhanced Combiner PDF...');
+      const r = await fetch(`${API_URL}/api/enhanced/export-pdf`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model_id: 'enhanced_combiner',
+          universe: enhancedCombinerUniverse,
+          top_n: 20,
+          include_context: true,
+          combined_results: enhancedCombinerResults
+        })
+      });
+      if (r.ok) {
+        const b = await r.blob();
+        const u = URL.createObjectURL(b);
+        const a = document.createElement('a');
+        a.href = u;
+        a.download = `enhanced_combiner_${enhancedCombinerUniverse}_${new Date().toISOString().split('T')[0]}.pdf`;
+        a.click();
+        URL.revokeObjectURL(u);
+        log('success', 'Enhanced Combiner PDF downloaded');
+      } else {
+        log('error', 'Failed to generate Enhanced Combiner PDF');
+      }
+    } catch (e) {
+      log('error', `Enhanced Combiner PDF error: ${e}`);
+    }
+  };
+
+  // Download PDF for Market Regime results
+  const downloadMarketRegimePDF = async () => {
+    if (!marketRegimeResults) { log('error', 'No results to export'); return; }
+    try {
+      log('info', 'Generating Market Regime PDF...');
+      const r = await fetch(`${API_URL}/api/advanced/market-regime/pdf?index=${marketRegimeIndex}&universe=${marketRegimeUniverse}`);
+      if (r.ok) {
+        const b = await r.blob();
+        const u = URL.createObjectURL(b);
+        const a = document.createElement('a');
+        a.href = u;
+        a.download = `market_regime_${marketRegimeIndex}_${new Date().toISOString().split('T')[0]}.pdf`;
+        a.click();
+        URL.revokeObjectURL(u);
+        log('success', 'Market Regime PDF downloaded');
+      } else {
+        log('error', 'Failed to generate Market Regime PDF');
+      }
+    } catch (e) {
+      log('error', `Market Regime PDF error: ${e}`);
+    }
+  };
+
+  // Model Validation functions
+  const runModelValidation = async () => {
+    if (!validationModel) { log('error', 'Please select a model'); return; }
+    setValidationRunning(true);
+    log('info', `Validating model: ${validationModel}...`);
+    try {
+      const r = await fetch(`${API_URL}/api/enhanced/validate-model`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model_id: validationModel,
+          universe: validationUniverse,
+          holding_period: validationHoldingPeriod,
+          n_simulations: 50
+        })
+      });
+      if (r.ok) {
+        const d = await r.json();
+        setValidationResults(d);
+        log('success', `Validation complete: ${d.validation?.verdict?.verdict || 'Done'}`);
+      } else {
+        const e = await r.json();
+        log('error', `Validation failed: ${e.detail || r.statusText}`);
+      }
+    } catch (e) {
+      log('error', `Validation error: ${e}`);
+    }
+    setValidationRunning(false);
+  };
+
+  const runValidateAllModels = async () => {
+    setValidationAllRunning(true);
+    log('info', 'Validating all models (this may take a while)...');
+    try {
+      const r = await fetch(`${API_URL}/api/enhanced/validate-all-models?universe=${validationUniverse}&holding_period=${validationHoldingPeriod}&n_simulations=30`);
+      if (r.ok) {
+        const d = await r.json();
+        setValidationAllResults(d);
+        log('success', `Validated ${d.models_tested} models. Top: ${d.top_models?.join(', ') || 'None'}`);
+      } else {
+        const e = await r.json();
+        log('error', `Validation failed: ${e.detail || r.statusText}`);
+      }
+    } catch (e) {
+      log('error', `Validation error: ${e}`);
+    }
+    setValidationAllRunning(false);
+  };
+
+  // Scheduled Scans functions
+  const loadScheduledScans = async () => {
+    try {
+      const r = await fetch(`${API_URL}/api/scheduled-scans/`);
+      if (r.ok) {
+        const d = await r.json();
+        setScheduledScans(d.scans || []);
+      }
+    } catch (e) { /* Scheduled scans endpoint may not exist yet */ }
+  };
+
+  const createScheduledScan = async () => {
+    if (!newScanModel) { log('error', 'Please select a model'); return; }
+    try {
+      const r = await fetch(`${API_URL}/api/scheduled-scans/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model_id: newScanModel,
+          universe: newScanUniverse,
+          schedule_time: newScanTime,
+          days: newScanDays,
+          enabled: true
+        })
+      });
+      if (r.ok) {
+        log('success', 'Scheduled scan created');
+        loadScheduledScans();
+        setNewScanModel('');
+      } else {
+        const e = await r.json();
+        log('error', `Failed to create scan: ${e.detail || r.statusText}`);
+      }
+    } catch (e) {
+      log('error', `Create scan error: ${e}`);
+    }
+  };
+
+  const deleteScheduledScan = async (scanId: string) => {
+    try {
+      const r = await fetch(`${API_URL}/api/scheduled-scans/${scanId}`, { method: 'DELETE' });
+      if (r.ok) {
+        log('success', 'Scheduled scan deleted');
+        loadScheduledScans();
+      }
+    } catch (e) {
+      log('error', `Delete scan error: ${e}`);
+    }
+  };
+
+  const toggleScheduledScan = async (scanId: string, enabled: boolean) => {
+    try {
+      const r = await fetch(`${API_URL}/api/scheduled-scans/${scanId}/toggle`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled })
+      });
+      if (r.ok) {
+        log('success', `Scan ${enabled ? 'enabled' : 'disabled'}`);
+        loadScheduledScans();
+      }
+    } catch (e) {
+      log('error', `Toggle scan error: ${e}`);
+    }
+  };
+
+  const downloadSignalCombinerPDF = async (result: any) => {
+    try {
+      log('info', 'Generating Signal Combiner PDF...');
+      const r = await fetch(`${API_URL}/api/advanced/signal-combiner/export-pdf`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(result)
+      });
+      if (r.ok) {
+        const contentType = r.headers.get('content-type');
+        if (contentType && contentType.includes('application/pdf')) {
+          const contentDisposition = r.headers.get('content-disposition');
+          let filename = 'signal_combiner.pdf';
+          if (contentDisposition) {
+            const match = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+            if (match && match[1]) {
+              filename = match[1].replace(/['"]/g, '');
+            }
+          }
+          const b = await r.blob();
+          const u = URL.createObjectURL(b);
+          const a = document.createElement('a');
+          a.href = u;
+          a.download = filename;
+          a.click();
+          URL.revokeObjectURL(u);
+          log('success', `PDF downloaded: ${filename}`);
+        } else {
+          const errorText = await r.text();
+          log('error', `Expected PDF but got: ${errorText.substring(0, 100)}`);
+        }
+      } else {
+        const errorData = await r.json().catch(() => ({ detail: r.statusText }));
+        log('error', `PDF download failed: ${errorData.detail || r.statusText}`);
+      }
+    } catch (e) {
+      log('error', `PDF download error: ${e}`);
+    }
+  };
+
+  const downloadSectorRotationPDF = async (result: any) => {
+    try {
+      log('info', 'Generating Sector Rotation PDF...');
+      const r = await fetch(`${API_URL}/api/advanced/sector-rotation/export-pdf`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(result)
+      });
+      if (r.ok) {
+        const contentType = r.headers.get('content-type');
+        if (contentType && contentType.includes('application/pdf')) {
+          const contentDisposition = r.headers.get('content-disposition');
+          let filename = 'sector_rotation.pdf';
+          if (contentDisposition) {
+            const match = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+            if (match && match[1]) {
+              filename = match[1].replace(/['"]/g, '');
+            }
+          }
+          const b = await r.blob();
+          const u = URL.createObjectURL(b);
+          const a = document.createElement('a');
+          a.href = u;
+          a.download = filename;
+          a.click();
+          URL.revokeObjectURL(u);
+          log('success', `PDF downloaded: ${filename}`);
+        } else {
+          const errorText = await r.text();
+          log('error', `Expected PDF but got: ${errorText.substring(0, 100)}`);
+        }
+      } else {
+        const errorData = await r.json().catch(() => ({ detail: r.statusText }));
+        log('error', `PDF download failed: ${errorData.detail || r.statusText}`);
+      }
+    } catch (e) {
+      log('error', `PDF download error: ${e}`);
+    }
+  };
+
+
+  const downloadBacktestCSV = async (result: BacktestResult) => {
+    try {
+      log('info', 'Generating CSV...');
+      const r = await fetch(`${API_URL}/api/advanced/backtest/export-csv`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(result)
+      });
+      if (r.ok) {
+        const contentType = r.headers.get('content-type');
+        if (contentType && contentType.includes('text/csv')) {
+          const contentDisposition = r.headers.get('content-disposition');
+          let filename = 'backtest.csv';
+          if (contentDisposition) {
+            const match = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+            if (match && match[1]) {
+              filename = match[1].replace(/['"]/g, '');
+            }
+          }
+          const b = await r.blob();
+          const u = URL.createObjectURL(b);
+          const a = document.createElement('a');
+          a.href = u;
+          a.download = filename;
+          a.click();
+          URL.revokeObjectURL(u);
+          log('success', `CSV downloaded: ${filename}`);
+        } else {
+          const errorText = await r.text();
+          log('error', `Expected CSV but got: ${errorText.substring(0, 100)}`);
+        }
+      } else {
+        const errorData = await r.json().catch(() => ({ detail: r.statusText }));
+        log('error', `CSV download failed: ${errorData.detail || r.statusText}`);
+      }
+    } catch (e) {
+      log('error', `CSV download error: ${e}`);
+    }
+  };
+
+  // Generate QuantStats Tearsheet
+  const generateTearsheet = async () => {
+    if (!backtestModel) { log('error', 'Please select a model first'); return; }
+    setTearsheetLoading(true);
+    log('info', `Generating QuantStats performance report for ${backtestModel}...`);
+    try {
+      const r = await fetch(`${API_URL}/api/backtest/tearsheet`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model_id: backtestModel,
+          universe: backtestUniverse,
+          initial_capital: backtestCapital,
+          max_positions: backtestMaxPositions,
+          position_size: backtestPositionSize
+        })
+      });
+      if (r.ok) {
+        const data = await r.json();
+        setTearsheetData(data);
+        log('success', `Performance report generated: Sharpe ${data.metrics?.sharpe || 'N/A'}, CAGR ${data.metrics?.cagr || 'N/A'}%`);
+      } else {
+        const e = await r.json();
+        log('error', `Performance report failed: ${e.detail || r.statusText}`);
+      }
+    } catch (e: any) {
+      log('error', `Performance report error: ${e.message || e}`);
+    }
+    setTearsheetLoading(false);
+  };
+
+  const downloadPDF = async (id: string) => {
+    try {
+      log('info', `Downloading PDF for run: ${id}`);
+      const r = await fetch(`${API_URL}/api/models/history/${id}/pdf?limit=${topN}`);
+      if (r.ok) {
+        const contentType = r.headers.get('content-type');
+        if (contentType && contentType.includes('application/pdf')) {
+          // Extract filename from Content-Disposition header
+          const contentDisposition = r.headers.get('content-disposition');
+          let filename = `${id}.pdf`; // fallback
+          if (contentDisposition) {
+            // Try multiple patterns to extract filename
+            // Pattern 1: filename="value" or filename='value'
+            let match = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+            if (match && match[1]) {
+              filename = match[1].replace(/['"]/g, '');
+            } else {
+              // Pattern 2: filename*=UTF-8''value
+              match = contentDisposition.match(/filename\*=UTF-8''([^;\n]*)/);
+              if (match && match[1]) {
+                filename = decodeURIComponent(match[1]);
+              } else {
+                // Pattern 3: filename=value (no quotes)
+                match = contentDisposition.match(/filename=([^;\n]+)/);
+                if (match && match[1]) {
+                  filename = match[1].trim();
+                }
+              }
+            }
+            log('info', `Extracted filename from header: ${filename}`);
+          } else {
+            log('info', 'No Content-Disposition header found, using fallback filename');
+          }
+
+          const b = await r.blob();
+          const u = URL.createObjectURL(b);
+          const a = document.createElement('a');
+          a.href = u;
+          a.download = filename;
+          a.click();
+          URL.revokeObjectURL(u);
+          log('success', `PDF downloaded: ${filename}`);
+        } else {
+          const errorText = await r.text();
+          log('error', `Expected PDF but got: ${errorText.substring(0, 100)}`);
+        }
+      } else {
+        const errorData = await r.json().catch(() => ({ detail: r.statusText }));
+        log('error', `PDF download failed: ${errorData.detail || r.statusText}`);
+      }
+    } catch (e) {
+      log('error', `PDF download error: ${e}`);
+    }
+  };
+
+  const createUniverse = async () => {
+    try {
+      const r = await fetch(`${API_URL}/api/custom-universe/import`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newUni.name, description: newUni.desc, ticker_text: newUni.tickers, market: newUni.market }) });
+      if (r.ok) { log('success', 'Universe created'); setNewUni({ name: '', desc: '', tickers: '', market: 'US' }); setParsePreview(null); loadAll(); }
+    } catch (e) { log('error', `${e}`); }
+  };
+
+  const parseTickerText = async () => {
+    if (!newUni.tickers.trim()) { setParsePreview(null); return; }
+    try {
+      const formData = new FormData();
+      formData.append('ticker_text', newUni.tickers);
+      const r = await fetch(`${API_URL}/api/custom-universe/parse`, {
+        method: 'POST',
+        body: formData
+      });
+      if (r.ok) {
+        const d = await r.json();
+        setParsePreview(d);
+        log('info', `Preview: ${d.tickers?.length || 0} tickers found`);
+      }
+    } catch (e) { log('error', `Parse error: ${e}`); }
+  };
+
+  const updateCustomUniverse = async (universeId: string, name: string, desc: string, tickers: string, market: string) => {
+    try {
+      const r = await fetch(`${API_URL}/api/custom-universe/${universeId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, description: desc, tickers: tickers.split(',').map((t: string) => t.trim()).filter((t: string) => t), market })
+      });
+      if (r.ok) {
+        log('success', 'Universe updated');
+        setEditingUniverse(null);
+        loadAll();
+      } else {
+        const e = await r.json();
+        log('error', `Update failed: ${e.detail || r.statusText}`);
+      }
+    } catch (e) { log('error', `Update error: ${e}`); }
+  };
+
+  const deleteCustomUniverse = async (universeId: string) => {
+    if (!confirm('Are you sure you want to delete this universe?')) return;
+    try {
+      const r = await fetch(`${API_URL}/api/custom-universe/${universeId}`, { method: 'DELETE' });
+      if (r.ok) {
+        log('success', 'Universe deleted');
+        loadAll();
+      } else {
+        const e = await r.json();
+        log('error', `Delete failed: ${e.detail || r.statusText}`);
+      }
+    } catch (e) { log('error', `Delete error: ${e}`); }
+  };
+
+
+  const loadUniverseDetails = async (universeId: string) => {
+    setSelectedUniverseId(universeId);
+    setUniverseDetails(null);
+    setUniverseStocks([]);
+    try {
+      const r = await fetch(`${API_URL}/api/universe/${universeId}`);
+      if (r.ok) {
+        const d = await r.json();
+        setUniverseDetails(d);
+      } else {
+        const errorText = await r.text();
+        log('error', `Failed to load universe details: ${r.status} ${errorText}`);
+      }
+    } catch (e: any) {
+      log('error', `Failed to load universe details: ${e.message || e}`);
+    }
+
+    try {
+      const r2 = await fetch(`${API_URL}/api/universe/${universeId}/stocks`);
+      if (r2.ok) {
+        const d2 = await r2.json();
+        setUniverseStocks(d2.stocks || []);
+      } else {
+        const errorText = await r2.text();
+        log('error', `Failed to load universe stocks: ${r2.status} ${errorText}`);
+      }
+    } catch (e: any) {
+      log('error', `Failed to load universe stocks: ${e.message || e}`);
+    }
+  };
+
+  const loadStockDetails = async (ticker: string) => {
+    setSelectedStock(ticker);
+    try {
+      const r = await fetch(`${API_URL}/api/universe/stock/${ticker}`);
+      if (r.ok) {
+        const d = await r.json();
+        setStockDetails(d);
+      }
+    } catch (e) { log('error', `Failed to load stock details: ${e}`); }
+  };
+
+  const clearHistory = async () => {
+    if (!confirm('Are you sure you want to clear all run history?')) return;
+    try {
+      const r = await fetch(`${API_URL}/api/models/history`, { method: 'DELETE' });
+      if (r.ok) {
+        log('success', 'History cleared');
+        loadAll();
+      } else {
+        const e = await r.json();
+        log('error', `Clear failed: ${e.detail || r.statusText}`);
+      }
+    } catch (e) { log('error', `Clear error: ${e}`); }
+  };
+
+  const clearCache = async () => {
+    try {
+      const r = await fetch(`${API_URL}/api/status/clear-cache`, { method: 'POST' });
+      if (r.ok) {
+        log('success', 'Cache cleared');
+      } else {
+        const e = await r.json();
+        log('error', `Clear cache failed: ${e.detail || r.statusText}`);
+      }
+    } catch (e) { log('error', `Clear cache error: ${e}`); }
+  };
+
+  const testDataFetch = async () => {
+    try {
+      log('info', 'Testing data fetch...');
+      const r = await fetch(`${API_URL}/api/status/test-data`);
+      if (r.ok) {
+        const d = await r.json();
+        log('success', `Data fetch test: ${d.conclusion}`);
+        if (d.price_data?.status === 'success') {
+          log('info', `Price data: ${d.price_data.rows} rows, latest: $${d.price_data.latest_close}`);
+        }
+        if (d.fundamental_data?.status === 'success') {
+          log('info', `Fundamental data: ${d.fundamental_data.name} - P/E: ${d.fundamental_data.pe_ratio}`);
+        }
+      }
+    } catch (e) { log('error', `Test failed: ${e}`); }
+  };
+
+  const loadStatusLogs = async () => {
+    try {
+      const r = await fetch(`${API_URL}/api/status/logs`);
+      if (r.ok) {
+        const d = await r.json();
+        if (d.fetch_errors && d.fetch_errors.length > 0) {
+          log('info', `Found ${d.fetch_errors.length} fetch errors in system logs`);
+        }
+      }
+    } catch (e) { log('error', `Failed to load logs: ${e}`); }
+  };
+
+  useEffect(() => {
+    checkConn().then(ok => {
+      if (ok) {
+        loadAll();
+      }
+    });
+  }, []);
+
+  // Reload history when history tab is opened
+  useEffect(() => {
+    if (tab === 'history') {
+      loadAll();
+    }
+  }, [tab]);
+
+  // Sidebar menu items
+  const mainMenuItems = [
+    { id: 'models', icon: '📚', label: 'Models' },
+    { id: 'analysis', icon: '🔍', label: 'Analysis' },
+    { id: 'screening', icon: '🏭', label: 'Screening' },
+    { id: 'advanced', icon: '⚡', label: 'Advanced' },
+    { id: 'backtest', icon: '📊', label: 'Backtest' },
+    { id: 'universe', icon: '🌐', label: 'Universe' },
+    { id: 'model-detail', icon: '📖', label: 'Model Details' },
+    { id: 'history', icon: '📜', label: 'History' },
+    { id: 'status', icon: '🔧', label: 'Status' },
+    { id: 'settings', icon: '⚙️', label: 'Settings' },
+  ] as const;
+
+  const modelSubMenuItems = [
+    { id: 'all', label: 'All Models' },
+    { id: 'technical', label: 'Technical Models' },
+    { id: 'fundamental', label: 'Fundamental Models' },
+    { id: 'quantitative', label: 'Quantitative Models' },
+  ] as const;
+
+  const advancedSubMenuItems = [
+    { id: 'combiner', label: 'Signal Combiner' },
+    { id: 'enhanced-combiner', label: 'Enhanced Combiner' },
+    { id: 'sector', label: 'Sector Rotation' },
+    { id: 'regime', label: 'Market Regime' },
+    { id: 'validation', label: 'Model Validation' },
+    { id: 'scheduled', label: 'Scheduled Scans' },
+  ] as const;
+
+  return (
+    <>
+      <Navbar />
+      <div style={{ minHeight: '100vh', background: 'var(--background)', color: 'var(--foreground)', display: 'flex', marginTop: '68px' }}>
+        {/* Sidebar */}
+        <div style={{
+          width: sidebarCollapsed ? '70px' : '240px',
+          background: 'var(--card)',
+          borderRight: '3px solid var(--border)',
+          display: 'flex',
+          flexDirection: 'column',
+          transition: 'width 0.2s ease',
+          flexShrink: 0,
+          height: '100vh',
+          position: 'sticky',
+          top: 0,
+          overflowY: 'auto',
+          fontFamily: 'var(--font-sans)'
+        }}>
+          {/* Sidebar Header with Logo */}
+          <div style={{ padding: '1rem', borderBottom: '3px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              {!sidebarCollapsed && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{
+                    fontSize: '1.4rem',
+                    fontWeight: '900',
+                    fontFamily: 'var(--font-sans)',
+                    letterSpacing: '-1px',
+                    color: 'var(--foreground)',
+                    textTransform: 'uppercase' as const,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}>
+                    <span style={{
+                      background: 'var(--primary)',
+                      color: '#fff',
+                      padding: '4px 8px',
+                      border: '3px solid var(--border)',
+                      boxShadow: '3px 3px 0 var(--border)'
+                    }}>Q</span>
+                    <span>UANT</span>
+                  </span>
+                  <span style={{ fontSize: '9px', padding: '2px 6px', background: 'var(--primary)', color: '#fff', fontWeight: '700', border: '2px solid var(--border)', transform: 'rotate(-2deg)' }}>v2.0.2</span>
+                </div>
+              )}
+              {sidebarCollapsed && <span style={{ fontSize: '1.2rem' }}>📈</span>}
+              <button
+                onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                style={{ background: 'var(--card)', border: '2px solid var(--border)', cursor: 'pointer', padding: '6px 8px', fontSize: '1rem', color: 'var(--foreground)', fontWeight: '700', boxShadow: '2px 2px 0 var(--border)' }}
+                title={sidebarCollapsed ? 'Expand' : 'Collapse'}
+              >
+                {sidebarCollapsed ? '→' : '←'}
+              </button>
+            </div>
+
+            {/* Universe Selector - moved below logo */}
+            {!sidebarCollapsed && (
+              <div>
+                <label style={{ fontSize: '0.7rem', fontWeight: '700', color: 'var(--muted-foreground)', display: 'block', marginBottom: '4px', textTransform: 'uppercase' as const, letterSpacing: '0.5px', fontFamily: 'var(--font-sans)' }}>UNIVERSE</label>
+                <UniverseSelector
+                  current={universe}
+                  universes={universes}
+                  customUniverses={customUniverses}
+                  onChange={setUniverse}
+                  sidebarCollapsed={sidebarCollapsed}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Connection Status */}
+          <div style={{ padding: '0.75rem 1rem', borderBottom: '3px solid var(--border)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span style={S.dot(connected)} />
+            {!sidebarCollapsed && <span style={{ fontSize: '0.8rem', fontWeight: '600', color: 'var(--muted-foreground)', fontFamily: 'var(--font-sans)', textTransform: 'uppercase' as const }}>{connected ? 'Connected' : 'Disconnected'}</span>}
+          </div>
+
+          {/* Main Menu */}
+          <div style={{ flex: 1, padding: '0.5rem' }}>
+            {mainMenuItems.map(item => (
+              <div key={item.id}>
+                <button
+                  onClick={() => setTab(item.id)}
+                  style={{
+                    width: '100%',
+                    padding: sidebarCollapsed ? '0.75rem' : '0.75rem 1rem',
+                    background: tab === item.id ? 'var(--primary)' : 'var(--card)',
+                    color: tab === item.id ? '#ffffff' : 'var(--foreground)',
+                    border: tab === item.id ? '3px solid var(--border)' : '2px solid transparent',
+                    borderRadius: '0',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.6rem',
+                    fontSize: '0.875rem',
+                    fontWeight: '700',
+                    fontFamily: 'var(--font-sans)',
+                    marginBottom: '4px',
+                    justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
+                    transition: 'all 0.1s ease',
+                    boxShadow: tab === item.id ? '3px 3px 0 var(--border)' : 'none',
+                    textTransform: 'uppercase' as const,
+                    letterSpacing: '0.3px'
+                  }}
+                  title={sidebarCollapsed ? item.label : undefined}
+                >
+                  <span>{item.icon}</span>
+                  {!sidebarCollapsed && <span>{item.label}</span>}
+                </button>
+
+                {/* Sub-menu for Models */}
+                {item.id === 'models' && tab === 'models' && !sidebarCollapsed && (
+                  <div style={{ marginLeft: '1rem', marginTop: '6px', marginBottom: '10px', borderLeft: '3px solid var(--border)', paddingLeft: '8px' }}>
+                    {modelSubMenuItems.map(sub => (
+                      <button
+                        key={sub.id}
+                        onClick={() => setModelSubTab(sub.id)}
+                        style={{
+                          width: '100%',
+                          padding: '0.5rem 0.75rem',
+                          background: modelSubTab === sub.id ? 'var(--muted)' : 'transparent',
+                          color: modelSubTab === sub.id ? 'var(--foreground)' : 'var(--muted-foreground)',
+                          border: modelSubTab === sub.id ? '2px solid var(--border)' : '2px solid transparent',
+                          borderRadius: '0',
+                          cursor: 'pointer',
+                          fontSize: '0.8rem',
+                          fontWeight: '600',
+                          fontFamily: 'var(--font-sans)',
+                          textAlign: 'left',
+                          marginBottom: '3px',
+                          boxShadow: modelSubTab === sub.id ? '2px 2px 0 var(--border)' : 'none'
+                        }}
+                      >
+                        {sub.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Sub-menu for Advanced */}
+                {item.id === 'advanced' && tab === 'advanced' && !sidebarCollapsed && (
+                  <div style={{ marginLeft: '1rem', marginTop: '6px', marginBottom: '10px', borderLeft: '3px solid var(--border)', paddingLeft: '8px' }}>
+                    {advancedSubMenuItems.map(sub => (
+                      <button
+                        key={sub.id}
+                        onClick={() => setAdvancedSubTab(sub.id)}
+                        style={{
+                          width: '100%',
+                          padding: '0.5rem 0.75rem',
+                          background: advancedSubTab === sub.id ? 'var(--muted)' : 'transparent',
+                          color: advancedSubTab === sub.id ? 'var(--foreground)' : 'var(--muted-foreground)',
+                          border: advancedSubTab === sub.id ? '2px solid var(--border)' : '2px solid transparent',
+                          borderRadius: '0',
+                          cursor: 'pointer',
+                          fontSize: '0.8rem',
+                          fontWeight: '600',
+                          fontFamily: 'var(--font-sans)',
+                          textAlign: 'left',
+                          marginBottom: '3px',
+                          boxShadow: advancedSubTab === sub.id ? '2px 2px 0 var(--border)' : 'none'
+                        }}
+                      >
+                        {sub.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>\n      </div>
+
+        {/* Main Content */}
+        <div style={{ flex: 1, overflowY: 'auto', height: '100vh' }}>
+          <div style={{ padding: '1.25rem', maxWidth: '1400px', margin: '0 auto' }}>
+            {/* Connection Warning */}
+            {!connected && <div style={{ ...S.card, background: 'var(--accent)', borderLeft: '4px solid var(--primary)', color: 'var(--accent-foreground)' }}><h3 style={{ margin: '0 0 0.5rem 0' }}>⚠️ Backend Not Connected</h3><p style={{ margin: 0 }}>Make sure the backend is running and accessible.</p></div>}
+
+            {/* HISTORY */}
+            {tab === 'history' && (
+              <div style={S.card}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
+                  <h2 style={{ margin: 0 }}>📜 Run History</h2>
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <button style={S.btn('secondary')} onClick={loadAll}>Refresh</button>
+                    <button style={{ ...S.btn('danger'), fontSize: '12px', padding: '6px 12px' }} onClick={clearHistory}>
+                      🗑️ Clear History
+                    </button>
+                  </div>
+                </div>
+                {history.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--muted-foreground)' }}>
+                    <p style={{ marginBottom: '1rem' }}>No runs yet.</p>
+                    <p style={{ fontSize: '0.875rem' }}>Run a model from the Models tab to see history here.</p>
+                    <button style={{ ...S.btn('primary'), marginTop: '1rem' }} onClick={loadAll}>🔄 Check Again</button>
+                  </div>
+                ) : (
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                    <thead><tr style={{ background: 'var(--muted)' }}><th style={{ padding: '10px', textAlign: 'left', color: 'var(--muted-foreground)' }}>Time</th><th style={{ color: 'var(--muted-foreground)' }}>Model</th><th style={{ color: 'var(--muted-foreground)' }}>Universe</th><th style={{ color: 'var(--muted-foreground)' }}>Buy</th><th style={{ color: 'var(--muted-foreground)' }}>Sell</th><th style={{ color: 'var(--muted-foreground)' }}>Actions</th></tr></thead>
+                    <tbody>
+                      {history.map(r => (
+                        <tr key={r.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                          <td style={{ padding: '10px' }}>{new Date(r.run_timestamp).toLocaleString()}</td>
+                          <td style={{ padding: '10px', fontWeight: 'bold' }}>{r.model_name}</td>
+                          <td>{r.universe}</td>
+                          <td style={{ textAlign: 'center', color: '#22c55e' }}>{r.buy_signals?.length || 0}</td>
+                          <td style={{ textAlign: 'center', color: 'var(--destructive)' }}>{r.sell_signals?.length || 0}</td>
+                          <td style={{ textAlign: 'center' }}><button style={S.btn('primary')} onClick={() => downloadPDF(r.id)}>📄 PDF</button></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            )}
+
+            {/* MODELS */}
+            {tab === 'models' && (
+              <>
+                {!connected && <div style={{ ...S.card, background: 'var(--accent)', borderLeft: '4px solid var(--primary)', color: 'var(--accent-foreground)' }}><h3 style={{ margin: '0 0 0.5rem 0' }}>⚠️ Backend Not Connected</h3><p style={{ margin: 0 }}>Make sure the backend is running and accessible.</p></div>}
+                {connected && (
+                  <>
+                    {/* All Models or Technical */}
+                    {(modelSubTab === 'all' || modelSubTab === 'technical') && (
+                      <>
+                        <h2>📊 Technical Models ({models.filter(m => m.category === 'Technical').length})</h2>
+                        <p style={{ color: 'var(--muted-foreground)', marginBottom: '15px' }}>Chart patterns, indicators, and price action strategies</p>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '15px', marginBottom: '30px' }}>
+                          {models.filter(m => m.category === 'Technical').map(m => <ModelCard key={m.id} model={m} result={results[m.id]} running={running === m.id} onRun={() => runModel(m.id)} onPDF={downloadPDF} onEnhancedPDF={downloadEnhancedPDF} onRunWithParams={(params) => runModelWithParams(m.id, params)} />)}
+                        </div>
+                      </>
+                    )}
+
+                    {/* All Models or Fundamental */}
+                    {(modelSubTab === 'all' || modelSubTab === 'fundamental') && (
+                      <>
+                        <h2 style={{ marginTop: modelSubTab === 'all' ? '30px' : '0' }}>💰 Fundamental Models ({models.filter(m => m.category === 'Fundamental').length})</h2>
+                        <p style={{ color: 'var(--muted-foreground)', marginBottom: '15px' }}>Value investing, quality metrics, and financial analysis</p>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '15px', marginBottom: '30px' }}>
+                          {models.filter(m => m.category === 'Fundamental').map(m => <ModelCard key={m.id} model={m} result={results[m.id]} running={running === m.id} onRun={() => runModel(m.id)} onPDF={downloadPDF} onEnhancedPDF={downloadEnhancedPDF} onRunWithParams={(params) => runModelWithParams(m.id, params)} />)}
+                        </div>
+                      </>
+                    )}
+
+                    {/* All Models or Quantitative */}
+                    {(modelSubTab === 'all' || modelSubTab === 'quantitative') && (
+                      <>
+                        <h2 style={{ marginTop: modelSubTab === 'all' ? '30px' : '0' }}>🔢 Quantitative Models ({models.filter(m => m.category === 'Quantitative').length})</h2>
+                        <p style={{ color: 'var(--muted-foreground)', marginBottom: '15px' }}>Statistical arbitrage and quantitative strategies</p>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '15px' }}>
+                          {models.filter(m => m.category === 'Quantitative').map(m => <ModelCard key={m.id} model={m} result={results[m.id]} running={running === m.id} onRun={() => runModel(m.id)} onPDF={downloadPDF} onEnhancedPDF={downloadEnhancedPDF} onRunWithParams={(params) => runModelWithParams(m.id, params)} />)}
+                        </div>
+                      </>
+                    )}
+                  </>
+                )}
+              </>
+            )}
+
+            {/* STOCK ANALYZER */}
+            {tab === 'analysis' && <StockAnalyzer />}
+
+            {/* SCREENING - Sector Browser & Financial Statements */}
+            {tab === 'screening' && (
+              <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+                <div style={S.card}>
+                  <h2 style={{ marginTop: 0 }}>🏭 Thai Stock Screening</h2>
+                  <p style={{ color: 'var(--muted-foreground)' }}>Browse by SET sector and view financial statements via SETSMART API.</p>
+
+                  {/* Sector Grid */}
+                  <h3 style={{ marginTop: '20px' }}>📊 SET Sectors</h3>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '10px', marginBottom: '25px' }}>
+                    {['Technology', 'Financials', 'Energy', 'Healthcare', 'Consumer', 'Industrials', 'Real Estate', 'Materials'].map(s => (
+                      <button
+                        key={s}
+                        style={{ ...S.btn('secondary'), width: '100%', padding: '12px', textAlign: 'left' as const }}
+                        onClick={async () => {
+                          try {
+                            const r = await fetch(`${API_URL}/api/screening/by-sector/${s}`);
+                            if (r.ok) {
+                              const d = await r.json();
+                              alert(`${s}: ${d.count || 0} stocks\n\n${(d.stocks || []).slice(0, 5).map((x: { ticker?: string }) => `• ${x.ticker || 'N/A'}`).join('\n')}`);
+                            }
+                          } catch (err) { console.error(err); }
+                        }}
+                      >{s}</button>
+                    ))}
+                  </div>
+
+                  {/* Financial Lookup */}
+                  <h3>📑 Financial Statements</h3>
+                  <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
+                    <input
+                      id="fin-ticker"
+                      style={{ ...S.input, marginBottom: 0, maxWidth: '180px' }}
+                      placeholder="PTT, ADVANC, SCB"
+                      onKeyDown={async (e) => {
+                        if (e.key === 'Enter') {
+                          const t = (e.target as HTMLInputElement).value.toUpperCase();
+                          if (t) {
+                            try {
+                              const r = await fetch(`${API_URL}/api/screening/financials/${t}`);
+                              if (r.ok) {
+                                const d = await r.json();
+                                const i = d.income_statement?.slice(-1)[0] || {};
+                                const b = d.balance_sheet?.slice(-1)[0] || {};
+                                alert(`${t}.BK\nRevenue: ${i.revenue ? (i.revenue / 1e6).toFixed(0) + 'M' : '-'}\nNet Income: ${i.net_income ? (i.net_income / 1e6).toFixed(0) + 'M' : '-'}\nAssets: ${b.total_assets ? (b.total_assets / 1e6).toFixed(0) + 'M' : '-'}`);
+                              }
+                            } catch (err) { console.error(err); }
+                          }
+                        }
+                      }}
+                    />
+                    <button
+                      style={S.btn('primary')}
+                      onClick={async () => {
+                        const el = document.getElementById('fin-ticker') as HTMLInputElement;
+                        const t = el?.value?.toUpperCase();
+                        if (!t) return;
+                        try {
+                          const r = await fetch(`${API_URL}/api/screening/financials/${t}`);
+                          if (r.ok) {
+                            const d = await r.json();
+                            const i = d.income_statement?.slice(-1)[0] || {};
+                            const b = d.balance_sheet?.slice(-1)[0] || {};
+                            alert(`${t}.BK\nRevenue: ${i.revenue ? (i.revenue / 1e6).toFixed(0) + 'M' : '-'}\nNet Income: ${i.net_income ? (i.net_income / 1e6).toFixed(0) + 'M' : '-'}\nAssets: ${b.total_assets ? (b.total_assets / 1e6).toFixed(0) + 'M' : '-'}`);
+                          }
+                        } catch (err) { console.error(err); }
+                      }}
+                    >Get</button>
+                  </div>
+                  <p style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>💡 Enter ticker without .BK suffix. Data from SETSMART API.</p>
+                </div>
+              </div>
+            )}
+
+            {/* UNIVERSE MANAGER */}
+            {tab === 'universe' && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                <div style={S.card}>
+                  <h3 style={{ marginTop: 0 }}>Create Custom Universe</h3>
+                  <input style={S.input} placeholder="Universe Name (e.g., My Watchlist)" value={newUni.name} onChange={e => setNewUni(p => ({ ...p, name: e.target.value }))} />
+                  <input style={S.input} placeholder="Description" value={newUni.desc} onChange={e => setNewUni(p => ({ ...p, desc: e.target.value }))} />
+                  <select style={{ ...S.select, width: '100%', marginBottom: '10px' }} value={newUni.market} onChange={e => setNewUni(p => ({ ...p, market: e.target.value }))}>
+                    <option value="US">US Market</option><option value="Thailand">Thailand (SET)</option><option value="Mixed">Mixed</option>
+                  </select>
+                  <textarea style={S.textarea} placeholder="Enter tickers (comma, space, or newline separated)&#10;e.g., AAPL, MSFT, GOOGL&#10;or PTT.BK AOT.BK KBANK.BK" value={newUni.tickers} onChange={e => { setNewUni(p => ({ ...p, tickers: e.target.value })); parseTickerText(); }} />
+                  <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
+                    <button style={{ ...S.btn('secondary'), fontSize: '12px', padding: '6px 12px' }} onClick={parseTickerText}>
+                      🔍 Preview Tickers
+                    </button>
+                    <button style={S.btn('success')} onClick={createUniverse}>✨ Create Universe</button>
+                  </div>
+
+                  {parsePreview && (
+                    <div style={{ padding: '10px', background: 'var(--accent)', color: 'var(--accent-foreground)', borderRadius: 'var(--radius)', fontSize: '12px', marginTop: '10px' }}>
+                      <strong>Preview:</strong> {parsePreview.tickers?.length || 0} tickers found
+                      {parsePreview.tickers && parsePreview.tickers.length > 0 && (
+                        <div style={{ marginTop: '5px', maxHeight: '100px', overflowY: 'auto' }}>
+                          {parsePreview.tickers.slice(0, 20).join(', ')}
+                          {parsePreview.tickers.length > 20 && ` ... and ${parsePreview.tickers.length - 20} more`}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+                <div style={S.card}>
+                  <h3 style={{ marginTop: 0 }}>Available Universes</h3>
+                  <h4>Built-in</h4>
+                  {universes.map(u => (
+                    <div key={u.id} style={{ padding: '8px', borderBottom: '1px solid var(--border)', cursor: 'pointer' }} onClick={() => loadUniverseDetails(u.id)}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div><b>{u.name}</b> ({u.count} stocks) - {u.market}</div>
+                        <button style={{ ...S.btn('secondary'), fontSize: '11px', padding: '4px 8px' }} onClick={(e) => { e.stopPropagation(); loadUniverseDetails(u.id); }}>
+                          View
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  <h4 style={{ marginTop: '20px' }}>Custom</h4>
+                  {customUniverses.length === 0 ? (
+                    <p style={{ color: 'var(--muted-foreground)' }}>No custom universes yet</p>
+                  ) : (
+                    customUniverses.map(u => (
+                      <div key={u.id} style={{ padding: '8px', borderBottom: '1px solid var(--border)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div><b>{u.name}</b> ({u.count} stocks) - {u.description}</div>
+                          <div style={{ display: 'flex', gap: '5px' }}>
+                            <button style={{ ...S.btn('secondary'), fontSize: '11px', padding: '4px 8px' }} onClick={() => setEditingUniverse(u)}>
+                              ✏️ Edit
+                            </button>
+                            <button style={{ ...S.btn('danger'), fontSize: '11px', padding: '4px 8px' }} onClick={() => deleteCustomUniverse(u.id)}>
+                              🗑️
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {/* Universe Details */}
+                {selectedUniverseId && (
+                  <div style={{ ...S.card, gridColumn: '1 / -1' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                      <h3 style={{ margin: 0 }}>Universe Details: {universeDetails?.name || selectedUniverseId}</h3>
+                      <button style={{ ...S.btn('secondary'), fontSize: '12px', padding: '6px 12px' }} onClick={() => { setSelectedUniverseId(null); setUniverseDetails(null); setUniverseStocks([]); }}>
+                        ✕ Close
+                      </button>
+                    </div>
+                    {universeDetails && (
+                      <div style={{ marginBottom: '20px' }}>
+                        <p><strong>Market:</strong> {universeDetails.market}</p>
+                        <p><strong>Stock Count:</strong> {universeDetails.count || universeStocks.length}</p>
+                      </div>
+                    )}
+                    {universeStocks.length > 0 && (
+                      <div>
+                        <h4>Stocks in Universe ({universeStocks.length})</h4>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '10px', maxHeight: '400px', overflowY: 'auto' }}>
+                          {universeStocks.map((stock: any, i: number) => (
+                            <div key={i} style={{ padding: '8px', background: 'var(--muted)', borderRadius: 'var(--radius)', cursor: 'pointer', transition: 'background 0.2s ease' }} onMouseEnter={(e) => e.currentTarget.style.background = 'var(--accent)'} onMouseLeave={(e) => e.currentTarget.style.background = 'var(--muted)'} onClick={() => loadStockDetails(stock.ticker)}>
+                              <div style={{ fontWeight: 'bold' }}>{stock.ticker?.replace('.BK', '')}</div>
+                              <div style={{ fontSize: '11px', color: 'var(--muted-foreground)' }}>{stock.name || stock.sector || ''}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Stock Details */}
+                {selectedStock && (
+                  <div style={{ ...S.card, gridColumn: '1 / -1' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                      <h3 style={{ margin: 0 }}>Stock Details: {selectedStock}</h3>
+                      <button style={{ ...S.btn('secondary'), fontSize: '12px', padding: '6px 12px' }} onClick={() => { setSelectedStock(null); setStockDetails(null); }}>
+                        ✕ Close
+                      </button>
+                    </div>
+                    {stockDetails && (
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px' }}>
+                        {Object.entries(stockDetails).map(([key, value]: [string, any]) => (
+                          <div key={key} style={{ padding: '10px', background: 'var(--muted)', borderRadius: 'var(--radius)' }}>
+                            <div style={{ fontSize: '11px', color: 'var(--muted-foreground)', marginBottom: '5px' }}>{key.replace(/_/g, ' ').toUpperCase()}</div>
+                            <div style={{ fontWeight: 'bold' }}>{value || 'N/A'}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Edit Custom Universe Modal */}
+                {editingUniverse && (
+                  <div style={{ ...S.card, gridColumn: '1 / -1', background: 'var(--card)', border: '2px solid var(--primary)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                      <h3 style={{ margin: 0 }}>Edit Universe: {editingUniverse.name}</h3>
+                      <button style={{ ...S.btn('secondary'), fontSize: '12px', padding: '6px 12px' }} onClick={() => setEditingUniverse(null)}>
+                        ✕ Cancel
+                      </button>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', fontWeight: 'bold' }}>Name</label>
+                        <input style={S.input} value={editingUniverse.name} onChange={e => setEditingUniverse({ ...editingUniverse, name: e.target.value })} />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', fontWeight: 'bold' }}>Market</label>
+                        <select style={{ ...S.select, width: '100%' }} value={editingUniverse.market} onChange={e => setEditingUniverse({ ...editingUniverse, market: e.target.value })}>
+                          <option value="US">US Market</option>
+                          <option value="Thailand">Thailand (SET)</option>
+                          <option value="Mixed">Mixed</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div style={{ marginTop: '15px' }}>
+                      <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', fontWeight: 'bold' }}>Description</label>
+                      <input style={S.input} value={editingUniverse.description || ''} onChange={e => setEditingUniverse({ ...editingUniverse, description: e.target.value })} />
+                    </div>
+                    <div style={{ marginTop: '15px' }}>
+                      <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', fontWeight: 'bold' }}>Tickers (comma-separated)</label>
+                      <textarea style={S.textarea} value={editingUniverse.tickers?.join(', ') || ''} onChange={e => setEditingUniverse({ ...editingUniverse, tickers: e.target.value.split(',').map((t: string) => t.trim()).filter((t: string) => t) })} />
+                    </div>
+                    <div style={{ marginTop: '15px', display: 'flex', gap: '10px' }}>
+                      <button style={S.btn('success')} onClick={() => updateCustomUniverse(editingUniverse.id, editingUniverse.name, editingUniverse.description || '', editingUniverse.tickers?.join(', ') || '', editingUniverse.market)}>
+                        💾 Save Changes
+                      </button>
+                      <button style={S.btn('secondary')} onClick={() => setEditingUniverse(null)}>
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* BACKTEST */}
+            {tab === 'backtest' && (
+              <>
+                <div style={S.card}>
+                  <h2 style={{ marginTop: 0 }}>📊 Model Backtesting</h2>
+                  <p style={{ color: 'var(--muted-foreground)', marginBottom: '20px' }}>Test model performance on historical data to identify which models actually work.</p>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', fontWeight: 'bold' }}>Model</label>
+                      <select style={{ ...S.select, width: '100%' }} value={backtestModel} onChange={e => setBacktestModel(e.target.value)}>
+                        <option value="">Select a model...</option>
+                        <optgroup label="Technical Models">
+                          {models.filter(m => m.category === 'Technical').map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                        </optgroup>
+                        <optgroup label="Fundamental Models">
+                          {models.filter(m => m.category === 'Fundamental').map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                        </optgroup>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', fontWeight: 'bold' }}>Universe</label>
+                      <select style={{ ...S.select, width: '100%' }} value={backtestUniverse} onChange={e => setBacktestUniverse(e.target.value)}>
+                        <optgroup label="Built-in">{universes.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}</optgroup>
+                        {customUniverses.length > 0 && <optgroup label="Custom">{customUniverses.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}</optgroup>}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', fontWeight: 'bold' }}>Initial Capital ($)</label>
+                      <input type="number" style={S.input} value={backtestCapital} onChange={e => setBacktestCapital(Number(e.target.value))} min={1000} step={1000} />
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', fontWeight: 'bold' }}>Holding Period (days)</label>
+                      <input type="number" style={S.input} value={backtestHoldingPeriod} onChange={e => setBacktestHoldingPeriod(Number(e.target.value))} min={1} max={252} />
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', fontWeight: 'bold' }}>Top N Signals</label>
+                      <input type="number" style={S.input} value={backtestTopN} onChange={e => setBacktestTopN(Number(e.target.value))} min={1} max={50} />
+                    </div>
+                  </div>
+
+                  {/* Risk Management Section */}
+                  <div style={{ ...S.card, background: 'var(--accent)', padding: '15px', marginBottom: '20px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px' }}>
+                      <span style={{ fontSize: '16px' }}>⚠️</span>
+                      <h4 style={{ margin: 0, fontSize: '14px' }}>Risk Management</h4>
+                      <label style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px' }}>
+                        <input type="checkbox" checked={useVectorBT} onChange={e => setUseVectorBT(e.target.checked)} />
+                        Advanced Mode (VectorBT)
+                      </label>
+                    </div>
+
+                    {useVectorBT && (
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '15px' }}>
+                        <div>
+                          <label style={{ display: 'block', marginBottom: '5px', fontSize: '12px', fontWeight: 'bold' }}>Stop-Loss %</label>
+                          <select style={{ ...S.select, width: '100%', fontSize: '12px' }} value={stopLoss ?? ''} onChange={e => setStopLoss(e.target.value ? Number(e.target.value) : null)}>
+                            <option value="">None</option>
+                            <option value="0.05">5%</option>
+                            <option value="0.10">10%</option>
+                            <option value="0.15">15%</option>
+                            <option value="0.20">20%</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', marginBottom: '5px', fontSize: '12px', fontWeight: 'bold' }}>Take-Profit %</label>
+                          <select style={{ ...S.select, width: '100%', fontSize: '12px' }} value={takeProfit ?? ''} onChange={e => setTakeProfit(e.target.value ? Number(e.target.value) : null)}>
+                            <option value="">None</option>
+                            <option value="0.20">20%</option>
+                            <option value="0.30">30%</option>
+                            <option value="0.50">50%</option>
+                            <option value="1.00">100%</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', marginBottom: '5px', fontSize: '12px', fontWeight: 'bold' }}>Rebalance</label>
+                          <select style={{ ...S.select, width: '100%', fontSize: '12px' }} value={rebalanceFreq} onChange={e => setRebalanceFreq(e.target.value)}>
+                            <option value="daily">Daily</option>
+                            <option value="weekly">Weekly</option>
+                            <option value="monthly">Monthly</option>
+                            <option value="quarterly">Quarterly</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', marginBottom: '5px', fontSize: '12px', fontWeight: 'bold' }}>Max Positions</label>
+                          <input type="number" style={{ ...S.input, fontSize: '12px' }} value={backtestMaxPositions} onChange={e => setBacktestMaxPositions(Number(e.target.value))} min={1} max={50} />
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', marginBottom: '5px', fontSize: '12px', fontWeight: 'bold' }}>Trailing Stop %</label>
+                          <select style={{ ...S.select, width: '100%', fontSize: '12px' }} value={trailingStop ?? ''} onChange={e => setTrailingStop(e.target.value ? Number(e.target.value) : null)}>
+                            <option value="">None</option>
+                            <option value="0.05">5%</option>
+                            <option value="0.10">10%</option>
+                            <option value="0.15">15%</option>
+                            <option value="0.20">20%</option>
+                          </select>
+                        </div>
+                      </div>
+                    )}
+
+                    {!useVectorBT && (
+                      <p style={{ margin: 0, fontSize: '12px', color: 'var(--muted-foreground)' }}>
+                        Enable Advanced Mode to access stop-loss, take-profit, and rebalancing features.
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                    <button
+                      style={{ ...S.btn('primary'), fontSize: '14px', padding: '10px 20px' }}
+                      onClick={runBacktest}
+                      disabled={!backtestModel || backtestRunning}
+                    >
+                      {backtestRunning ? '⏳ Running Backtest...' : '▶ Run Backtest'}
+                    </button>
+
+                    {useVectorBT && backtestModel && (
+                      <>
+                        <button
+                          style={{ ...S.btn('success'), fontSize: '14px', padding: '10px 20px' }}
+                          onClick={runMonteCarlo}
+                          disabled={!backtestModel || monteCarloLoading}
+                        >
+                          {monteCarloLoading ? '⏳ Simulating...' : '🎲 Monte Carlo'}
+                        </button>
+                        <button
+                          style={{ ...S.btn('secondary'), fontSize: '14px', padding: '10px 20px' }}
+                          onClick={runWalkForward}
+                          disabled={!backtestModel || walkForwardLoading}
+                        >
+                          {walkForwardLoading ? '⏳ Analyzing...' : '📈 Walk-Forward'}
+                        </button>
+                      </>
+                    )}
+
+                    {!useVectorBT && backtestModel && (
+                      <button
+                        style={{ ...S.btn('secondary'), fontSize: '14px', padding: '10px 20px' }}
+                        onClick={async () => {
+                          setBacktestRunning(true);
+                          try {
+                            log('info', `Running quick backtest for ${backtestModel}...`);
+                            const r = await fetch(`${API_URL}/api/advanced/backtest/${backtestModel}?universe=${backtestUniverse}`);
+                            if (r.ok) {
+                              const d = await r.json();
+                              setBacktestResults(d);
+                              log('success', 'Quick backtest completed');
+                            } else {
+                              const e = await r.json();
+                              log('error', `Quick backtest failed: ${e.detail || r.statusText}`);
+                            }
+                          } catch (e: any) {
+                            log('error', `Quick backtest error: ${e.message || e}`);
+                          }
+                          setBacktestRunning(false);
+                        }}
+                        disabled={backtestRunning}
+                      >
+                        ⚡ Quick Backtest (Defaults)
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Save/Load Configurations */}
+                <div style={{ ...S.card, borderLeft: '4px solid #f59e0b' }}>
+                  <h3 style={{ marginTop: 0, marginBottom: '15px' }}>💾 Configuration Management</h3>
+                  <div style={{ display: 'flex', gap: '10px', marginBottom: '15px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                    <div style={{ flex: 1, minWidth: '200px' }}>
+                      <label style={{ display: 'block', marginBottom: '5px', fontSize: '12px' }}>Config Name</label>
+                      <input
+                        type="text"
+                        style={{ ...S.input, fontSize: '12px' }}
+                        value={configName}
+                        onChange={e => setConfigName(e.target.value)}
+                        placeholder="My Strategy Config"
+                      />
+                    </div>
+                    <button style={{ ...S.btn('primary'), fontSize: '12px' }} onClick={saveConfig}>
+                      💾 Save Current
+                    </button>
+                  </div>
+                  {savedConfigs.length > 0 && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                      {savedConfigs.map((c, i) => (
+                        <div key={i} style={{ background: 'var(--muted)', padding: '8px 12px', borderRadius: 'var(--radius)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontSize: '12px', fontWeight: 'bold' }}>{c.name}</span>
+                          <button style={{ ...S.btn('success'), padding: '2px 6px', fontSize: '10px' }} onClick={() => loadConfig(c.config)}>Load</button>
+                          <button style={{ ...S.btn('secondary'), padding: '2px 6px', fontSize: '10px' }} onClick={() => deleteConfig(c.name)}>✕</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {savedConfigs.length === 0 && (
+                    <p style={{ margin: 0, fontSize: '12px', color: 'var(--muted-foreground)' }}>No saved configurations yet. Save your backtest settings for quick reuse.</p>
+                  )}
+                </div>
+
+                {/* Model Comparison */}
+                <div style={{ ...S.card, borderLeft: '4px solid #06b6d4' }}>
+                  <h3 style={{ marginTop: 0, marginBottom: '15px' }}>📊 Compare Models</h3>
+                  <p style={{ fontSize: '12px', color: 'var(--muted-foreground)', marginBottom: '15px' }}>Select multiple models to compare their backtest performance side-by-side.</p>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '15px' }}>
+                    {models.map(m => (
+                      <label key={m.id} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', padding: '4px 8px', background: compareModels.includes(m.id) ? '#06b6d4' : 'var(--muted)', borderRadius: '4px', cursor: 'pointer', color: compareModels.includes(m.id) ? 'white' : 'inherit' }}>
+                        <input
+                          type="checkbox"
+                          checked={compareModels.includes(m.id)}
+                          onChange={e => {
+                            if (e.target.checked) {
+                              setCompareModels([...compareModels, m.id]);
+                            } else {
+                              setCompareModels(compareModels.filter(id => id !== m.id));
+                            }
+                          }}
+                          style={{ display: 'none' }}
+                        />
+                        {m.name}
+                      </label>
+                    ))}
+                  </div>
+                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                    <button
+                      style={{ ...S.btn('primary'), fontSize: '12px' }}
+                      onClick={runModelComparison}
+                      disabled={compareModels.length < 2 || comparisonRunning}
+                    >
+                      {comparisonRunning ? '⏳ Comparing...' : `🔍 Compare ${compareModels.length} Models`}
+                    </button>
+                    {compareModels.length > 0 && (
+                      <button style={{ ...S.btn('secondary'), fontSize: '12px' }} onClick={() => setCompareModels([])}>Clear Selection</button>
+                    )}
+                  </div>
+
+                  {/* Comparison Results Table */}
+                  {comparisonResults.length > 0 && (
+                    <div style={{ marginTop: '20px', overflowX: 'auto' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                        <thead>
+                          <tr style={{ background: 'var(--muted)' }}>
+                            <th style={{ padding: '10px', textAlign: 'left' }}>Model</th>
+                            <th style={{ padding: '10px', textAlign: 'right' }}>Total Return</th>
+                            <th style={{ padding: '10px', textAlign: 'right' }}>Annual Return</th>
+                            <th style={{ padding: '10px', textAlign: 'right' }}>Sharpe</th>
+                            <th style={{ padding: '10px', textAlign: 'right' }}>Max Drawdown</th>
+                            <th style={{ padding: '10px', textAlign: 'right' }}>Sortino</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {comparisonResults.map((r, i) => (
+                            <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
+                              <td style={{ padding: '10px', fontWeight: 'bold' }}>{r.model_name || r.strategy_name}</td>
+                              <td style={{ padding: '10px', textAlign: 'right', color: (r.total_return ?? 0) >= 0 ? '#22c55e' : 'var(--destructive)' }}>{(r.total_return ?? 0).toFixed(2)}%</td>
+                              <td style={{ padding: '10px', textAlign: 'right', color: (r.annual_return ?? 0) >= 0 ? '#22c55e' : 'var(--destructive)' }}>{(r.annual_return ?? 0).toFixed(2)}%</td>
+                              <td style={{ padding: '10px', textAlign: 'right' }}>{(r.sharpe_ratio ?? 0).toFixed(2)}</td>
+                              <td style={{ padding: '10px', textAlign: 'right', color: 'var(--destructive)' }}>{(r.max_drawdown ?? 0).toFixed(2)}%</td>
+                              <td style={{ padding: '10px', textAlign: 'right' }}>{(r.sortino_ratio ?? 0).toFixed(2)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      <button style={{ ...S.btn('secondary'), marginTop: '10px', fontSize: '11px' }} onClick={() => setComparisonResults([])}>Clear Results</button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Parameter Optimization */}
+                {useVectorBT && (
+                  <div style={{ ...S.card, borderLeft: '4px solid #a855f7' }}>
+                    <h3 style={{ marginTop: 0, marginBottom: '15px' }}>🔧 Parameter Optimization</h3>
+                    <p style={{ fontSize: '12px', color: 'var(--muted-foreground)', marginBottom: '15px' }}>Find optimal model parameters using grid search.</p>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '15px' }}>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '5px', fontSize: '12px', fontWeight: 'bold' }}>Optimization Metric</label>
+                        <select style={{ ...S.select, width: '100%', fontSize: '12px' }} value={optimizationMetric} onChange={e => setOptimizationMetric(e.target.value)}>
+                          <option value="sharpe_ratio">Sharpe Ratio</option>
+                          <option value="total_return">Total Return</option>
+                          <option value="calmar_ratio">Calmar Ratio</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '5px', fontSize: '12px', fontWeight: 'bold' }}>Parameter Grid (JSON)</label>
+                        <input
+                          type="text"
+                          style={{ ...S.input, fontSize: '12px' }}
+                          value={optimizationParamGrid}
+                          onChange={e => setOptimizationParamGrid(e.target.value)}
+                          placeholder='{"threshold": [0.5, 0.6, 0.7]}'
+                        />
+                      </div>
+                    </div>
+                    <button
+                      style={{ ...S.btn('primary'), fontSize: '12px' }}
+                      onClick={runOptimization}
+                      disabled={!backtestModel || optimizationLoading}
+                    >
+                      {optimizationLoading ? '⏳ Optimizing...' : '🔧 Run Optimization'}
+                    </button>
+
+                    {/* Optimization Results */}
+                    {optimizationResults && (
+                      <div style={{ marginTop: '20px', background: 'var(--muted)', padding: '15px', borderRadius: 'var(--radius)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                          <h4 style={{ margin: 0 }}>Optimization Results</h4>
+                          <button style={{ ...S.btn('secondary'), fontSize: '10px', padding: '2px 6px' }} onClick={() => setOptimizationResults(null)}>Clear</button>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginBottom: '15px' }}>
+                          <div>
+                            <div style={{ fontSize: '10px', color: 'var(--muted-foreground)' }}>Best Sharpe</div>
+                            <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#22c55e' }}>{optimizationResults.best_sharpe?.toFixed(2)}</div>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '10px', color: 'var(--muted-foreground)' }}>Best Return</div>
+                            <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#22c55e' }}>{optimizationResults.best_return?.toFixed(2)}%</div>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '10px', color: 'var(--muted-foreground)' }}>Best Params</div>
+                            <div style={{ fontSize: '12px', fontWeight: 'bold' }}>{JSON.stringify(optimizationResults.best_params)}</div>
+                          </div>
+                        </div>
+                        {optimizationResults.all_results && (
+                          <details>
+                            <summary style={{ cursor: 'pointer', fontSize: '12px', color: 'var(--muted-foreground)' }}>View All Results ({optimizationResults.all_results.length})</summary>
+                            <div style={{ maxHeight: '200px', overflowY: 'auto', marginTop: '10px' }}>
+                              <table style={{ width: '100%', fontSize: '11px' }}>
+                                <thead>
+                                  <tr><th>Params</th><th>Sharpe</th><th>Return</th></tr>
+                                </thead>
+                                <tbody>
+                                  {optimizationResults.all_results.slice(0, 20).map((r: any, i: number) => (
+                                    <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
+                                      <td style={{ padding: '4px' }}>{JSON.stringify(r.params)}</td>
+                                      <td style={{ padding: '4px', textAlign: 'right' }}>{r.sharpe_ratio?.toFixed(2)}</td>
+                                      <td style={{ padding: '4px', textAlign: 'right' }}>{r.total_return?.toFixed(2)}%</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </details>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Monte Carlo Results */}
+                {monteCarloResults && (
+                  <div style={{ ...S.card, borderLeft: '4px solid #8b5cf6' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                      <h3 style={{ margin: 0 }}>🎲 Monte Carlo Simulation</h3>
+                      <button style={{ ...S.btn('secondary'), fontSize: '11px', padding: '4px 8px' }} onClick={() => setMonteCarloResults(null)}>Clear</button>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '15px' }}>
+                      <div style={{ background: 'var(--muted)', padding: '12px', borderRadius: 'var(--radius)', textAlign: 'center' }}>
+                        <div style={{ fontSize: '10px', color: 'var(--muted-foreground)', marginBottom: '4px' }}>Probability of Profit</div>
+                        <div style={{ fontSize: '20px', fontWeight: 'bold', color: monteCarloResults.probability_of_profit >= 0.5 ? '#22c55e' : 'var(--destructive)' }}>
+                          {(monteCarloResults.probability_of_profit * 100).toFixed(1)}%
+                        </div>
+                      </div>
+                      <div style={{ background: 'var(--muted)', padding: '12px', borderRadius: 'var(--radius)', textAlign: 'center' }}>
+                        <div style={{ fontSize: '10px', color: 'var(--muted-foreground)', marginBottom: '4px' }}>Expected Return</div>
+                        <div style={{ fontSize: '20px', fontWeight: 'bold', color: monteCarloResults.expected_return >= 0 ? '#22c55e' : 'var(--destructive)' }}>
+                          {(monteCarloResults.expected_return * 100).toFixed(2)}%
+                        </div>
+                      </div>
+                      <div style={{ background: 'var(--muted)', padding: '12px', borderRadius: 'var(--radius)', textAlign: 'center' }}>
+                        <div style={{ fontSize: '10px', color: 'var(--muted-foreground)', marginBottom: '4px' }}>95% VaR</div>
+                        <div style={{ fontSize: '20px', fontWeight: 'bold', color: 'var(--destructive)' }}>
+                          {(monteCarloResults.var_95 * 100).toFixed(2)}%
+                        </div>
+                      </div>
+                      <div style={{ background: 'var(--muted)', padding: '12px', borderRadius: 'var(--radius)', textAlign: 'center' }}>
+                        <div style={{ fontSize: '10px', color: 'var(--muted-foreground)', marginBottom: '4px' }}>95% CVaR</div>
+                        <div style={{ fontSize: '20px', fontWeight: 'bold', color: 'var(--destructive)' }}>
+                          {(monteCarloResults.cvar_95 * 100).toFixed(2)}%
+                        </div>
+                      </div>
+                    </div>
+                    <p style={{ marginTop: '12px', fontSize: '11px', color: 'var(--muted-foreground)' }}>
+                      Based on {monteCarloResults.simulations?.toLocaleString() || 1000} simulations over 252 trading days
+                    </p>
+                  </div>
+                )}
+
+                {/* Walk-Forward Results */}
+                {walkForwardResults && (
+                  <div style={{ ...S.card, borderLeft: '4px solid #06b6d4' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                      <h3 style={{ margin: 0 }}>📈 Walk-Forward Analysis</h3>
+                      <button style={{ ...S.btn('secondary'), fontSize: '11px', padding: '4px 8px' }} onClick={() => setWalkForwardResults(null)}>Clear</button>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px' }}>
+                      <div style={{ background: 'var(--muted)', padding: '15px', borderRadius: 'var(--radius)' }}>
+                        <div style={{ fontSize: '11px', color: 'var(--muted-foreground)', marginBottom: '5px' }}>Robustness Score</div>
+                        <div style={{ fontSize: '28px', fontWeight: 'bold', color: walkForwardResults.robustness_score >= 0.7 ? '#22c55e' : walkForwardResults.robustness_score >= 0.5 ? '#f59e0b' : 'var(--destructive)' }}>
+                          {(walkForwardResults.robustness_score * 100).toFixed(1)}%
+                        </div>
+                        <div style={{ fontSize: '10px', color: 'var(--muted-foreground)', marginTop: '4px' }}>
+                          {walkForwardResults.robustness_score >= 0.7 ? '✅ Robust strategy' : walkForwardResults.robustness_score >= 0.5 ? '⚠️ Moderate robustness' : '❌ Potential overfitting'}
+                        </div>
+                      </div>
+                      <div style={{ background: 'var(--muted)', padding: '15px', borderRadius: 'var(--radius)' }}>
+                        <div style={{ fontSize: '11px', color: 'var(--muted-foreground)', marginBottom: '10px' }}>Performance Summary</div>
+                        {walkForwardResults.overall_performance && (
+                          <div style={{ fontSize: '12px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                              <span>In-Sample Avg Return:</span>
+                              <span style={{ fontWeight: 'bold' }}>{((walkForwardResults.overall_performance.in_sample_avg_return || 0) * 100).toFixed(2)}%</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <span>Out-Sample Avg Return:</span>
+                              <span style={{ fontWeight: 'bold' }}>{((walkForwardResults.overall_performance.out_sample_avg_return || 0) * 100).toFixed(2)}%</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <p style={{ marginTop: '12px', fontSize: '11px', color: 'var(--muted-foreground)' }}>
+                      Tested across 5 periods with 70% in-sample / 30% out-of-sample split
+                    </p>
+                  </div>
+                )}
+
+                {backtestResults && (
+                  <div style={S.card}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '15px' }}>
+                      <div>
+                        <h3 style={{ marginTop: 0 }}>📈 Backtest Results: {backtestResults.model_name || backtestResults.strategy_name || 'Strategy'}</h3>
+                        <p style={{ color: 'var(--muted-foreground)', fontSize: '12px', margin: 0 }}>
+                          Period: {backtestResults.period || `${backtestResults.start_date} to ${backtestResults.end_date}`}
+                          {useVectorBT && <span style={{ marginLeft: '10px', padding: '2px 6px', background: '#8b5cf6', color: 'white', borderRadius: '4px', fontSize: '10px' }}>VectorBT</span>}
+                        </p>
+                      </div>
+                      <div style={{ display: 'flex', gap: '10px' }}>
+                        <button
+                          style={{ ...S.btn('secondary'), fontSize: '11px', padding: '4px 8px' }}
+                          onClick={() => setBacktestResults(null)}
+                        >
+                          Clear Results
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Performance Metrics - Handle both formats */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '15px', marginBottom: '20px' }}>
+                      <div style={{ background: 'var(--muted)', padding: '15px', borderRadius: 'var(--radius)' }}>
+                        <div style={{ fontSize: '11px', color: 'var(--muted-foreground)', marginBottom: '5px' }}>Total Return</div>
+                        <div style={{ fontSize: '24px', fontWeight: 'bold', color: (backtestResults.total_return ?? backtestResults.performance?.total_return_pct ?? 0) >= 0 ? '#22c55e' : 'var(--destructive)' }}>
+                          {(backtestResults.total_return ?? backtestResults.performance?.total_return_pct ?? 0) >= 0 ? '+' : ''}
+                          {(backtestResults.total_return ?? backtestResults.performance?.total_return_pct ?? 0).toFixed(2)}%
+                        </div>
+                      </div>
+
+                      <div style={{ background: 'var(--muted)', padding: '15px', borderRadius: 'var(--radius)' }}>
+                        <div style={{ fontSize: '11px', color: 'var(--muted-foreground)', marginBottom: '5px' }}>Annualized Return</div>
+                        <div style={{ fontSize: '24px', fontWeight: 'bold', color: (backtestResults.annual_return ?? backtestResults.performance?.annualized_return_pct ?? 0) >= 0 ? '#22c55e' : 'var(--destructive)' }}>
+                          {(backtestResults.annual_return ?? backtestResults.performance?.annualized_return_pct ?? 0) >= 0 ? '+' : ''}
+                          {(backtestResults.annual_return ?? backtestResults.performance?.annualized_return_pct ?? 0).toFixed(2)}%
+                        </div>
+                      </div>
+
+                      <div style={{ background: 'var(--muted)', padding: '15px', borderRadius: 'var(--radius)' }}>
+                        <div style={{ fontSize: '11px', color: 'var(--muted-foreground)', marginBottom: '5px' }}>Sharpe Ratio</div>
+                        <div style={{ fontSize: '24px', fontWeight: 'bold', color: (backtestResults.sharpe_ratio ?? backtestResults.performance?.sharpe_ratio ?? 0) >= 1 ? '#22c55e' : (backtestResults.sharpe_ratio ?? backtestResults.performance?.sharpe_ratio ?? 0) >= 0.5 ? '#f59e0b' : 'var(--destructive)' }}>
+                          {(backtestResults.sharpe_ratio ?? backtestResults.performance?.sharpe_ratio ?? 0).toFixed(2)}
+                        </div>
+                      </div>
+
+                      <div style={{ background: 'var(--muted)', padding: '15px', borderRadius: 'var(--radius)' }}>
+                        <div style={{ fontSize: '11px', color: 'var(--muted-foreground)', marginBottom: '5px' }}>Max Drawdown</div>
+                        <div style={{ fontSize: '24px', fontWeight: 'bold', color: 'var(--destructive)' }}>
+                          {(backtestResults.max_drawdown ?? backtestResults.performance?.max_drawdown_pct ?? 0).toFixed(2)}%
+                        </div>
+                      </div>
+
+                      <div style={{ background: 'var(--muted)', padding: '15px', borderRadius: 'var(--radius)' }}>
+                        <div style={{ fontSize: '11px', color: 'var(--muted-foreground)', marginBottom: '5px' }}>Final Value</div>
+                        <div style={{ fontSize: '24px', fontWeight: 'bold' }}>
+                          ${(backtestResults.final_value ?? backtestResults.performance?.final_value ?? backtestCapital).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                        </div>
+                      </div>
+
+                      {backtestResults.volatility && (
+                        <div style={{ background: 'var(--muted)', padding: '15px', borderRadius: 'var(--radius)' }}>
+                          <div style={{ fontSize: '11px', color: 'var(--muted-foreground)', marginBottom: '5px' }}>Volatility</div>
+                          <div style={{ fontSize: '24px', fontWeight: 'bold' }}>
+                            {backtestResults.volatility.toFixed(2)}%
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Additional VectorBT Metrics */}
+                    {backtestResults.sortino_ratio !== undefined && (
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '10px', marginBottom: '20px' }}>
+                        <div style={{ background: 'var(--accent)', padding: '10px', borderRadius: 'var(--radius)', textAlign: 'center' }}>
+                          <div style={{ fontSize: '10px', color: 'var(--muted-foreground)' }}>Sortino</div>
+                          <div style={{ fontSize: '16px', fontWeight: 'bold' }}>{backtestResults.sortino_ratio?.toFixed(2) ?? 'N/A'}</div>
+                        </div>
+                        <div style={{ background: 'var(--accent)', padding: '10px', borderRadius: 'var(--radius)', textAlign: 'center' }}>
+                          <div style={{ fontSize: '10px', color: 'var(--muted-foreground)' }}>Calmar</div>
+                          <div style={{ fontSize: '16px', fontWeight: 'bold' }}>{backtestResults.calmar_ratio?.toFixed(2) ?? 'N/A'}</div>
+                        </div>
+                        <div style={{ background: 'var(--accent)', padding: '10px', borderRadius: 'var(--radius)', textAlign: 'center' }}>
+                          <div style={{ fontSize: '10px', color: 'var(--muted-foreground)' }}>Best Day</div>
+                          <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#22c55e' }}>+{backtestResults.best_day?.toFixed(2) ?? 0}%</div>
+                        </div>
+                        <div style={{ background: 'var(--accent)', padding: '10px', borderRadius: 'var(--radius)', textAlign: 'center' }}>
+                          <div style={{ fontSize: '10px', color: 'var(--muted-foreground)' }}>Worst Day</div>
+                          <div style={{ fontSize: '16px', fontWeight: 'bold', color: 'var(--destructive)' }}>{backtestResults.worst_day?.toFixed(2) ?? 0}%</div>
+                        </div>
+                        <div style={{ background: 'var(--accent)', padding: '10px', borderRadius: 'var(--radius)', textAlign: 'center' }}>
+                          <div style={{ fontSize: '10px', color: 'var(--muted-foreground)' }}>DD Duration</div>
+                          <div style={{ fontSize: '16px', fontWeight: 'bold' }}>{backtestResults.max_drawdown_duration ?? 0}d</div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Equity Curve Visualization */}
+                    {backtestResults.equity_curve && backtestResults.equity_curve.length > 0 && (
+                      <div style={{ marginBottom: '20px' }}>
+                        <h4 style={{ marginBottom: '10px' }}>📊 Equity Curve</h4>
+                        <div style={{ background: 'var(--muted)', padding: '15px', borderRadius: 'var(--radius)', height: '200px', position: 'relative' }}>
+                          <svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none" style={{ overflow: 'visible' }}>
+                            {(() => {
+                              const data = backtestResults.equity_curve;
+                              const values = data.map((d: any) => d.value);
+                              const min = Math.min(...values);
+                              const max = Math.max(...values);
+                              const range = max - min || 1;
+                              const startValue = values[0];
+
+                              const points = data.map((d: any, i: number) => {
+                                const x = (i / (data.length - 1)) * 100;
+                                const y = 100 - ((d.value - min) / range) * 90 - 5;
+                                return `${x},${y}`;
+                              }).join(' ');
+
+                              // Create area fill
+                              const areaPath = `M0,100 L0,${100 - ((values[0] - min) / range) * 90 - 5} ` +
+                                data.map((d: any, i: number) => {
+                                  const x = (i / (data.length - 1)) * 100;
+                                  const y = 100 - ((d.value - min) / range) * 90 - 5;
+                                  return `L${x},${y}`;
+                                }).join(' ') + ` L100,100 Z`;
+
+                              return (
+                                <>
+                                  {/* Initial value line */}
+                                  <line x1="0" y1={100 - ((startValue - min) / range) * 90 - 5} x2="100" y2={100 - ((startValue - min) / range) * 90 - 5} stroke="#666" strokeWidth="0.2" strokeDasharray="1,1" />
+                                  {/* Area fill */}
+                                  <path d={areaPath} fill="url(#equityGradient)" opacity="0.3" />
+                                  {/* Line */}
+                                  <polyline points={points} fill="none" stroke="#22c55e" strokeWidth="0.5" />
+                                  {/* Gradient definition */}
+                                  <defs>
+                                    <linearGradient id="equityGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                                      <stop offset="0%" stopColor="#22c55e" stopOpacity="0.8" />
+                                      <stop offset="100%" stopColor="#22c55e" stopOpacity="0.1" />
+                                    </linearGradient>
+                                  </defs>
+                                </>
+                              );
+                            })()}
+                          </svg>
+                          <div style={{ position: 'absolute', bottom: '5px', left: '10px', fontSize: '10px', color: 'var(--muted-foreground)' }}>
+                            {backtestResults.equity_curve[0]?.date}
+                          </div>
+                          <div style={{ position: 'absolute', bottom: '5px', right: '10px', fontSize: '10px', color: 'var(--muted-foreground)' }}>
+                            {backtestResults.equity_curve[backtestResults.equity_curve.length - 1]?.date}
+                          </div>
+                          <div style={{ position: 'absolute', top: '5px', left: '10px', fontSize: '10px', color: 'var(--muted-foreground)' }}>
+                            High: ${Math.max(...backtestResults.equity_curve.map((d: any) => d.value)).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Drawdown Chart */}
+                    {backtestResults.drawdown_curve && backtestResults.drawdown_curve.length > 0 && (
+                      <div style={{ marginBottom: '20px' }}>
+                        <h4 style={{ marginBottom: '10px' }}>📉 Drawdown</h4>
+                        <div style={{ background: 'var(--muted)', padding: '15px', borderRadius: 'var(--radius)', height: '120px', position: 'relative' }}>
+                          <svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none">
+                            {(() => {
+                              const data = backtestResults.drawdown_curve;
+                              const values = data.map((d: any) => Math.abs(d.drawdown));
+                              const maxDD = Math.max(...values) || 1;
+
+                              const areaPath = `M0,0 ` +
+                                data.map((d: any, i: number) => {
+                                  const x = (i / (data.length - 1)) * 100;
+                                  const y = (Math.abs(d.drawdown) / maxDD) * 90;
+                                  return `L${x},${y}`;
+                                }).join(' ') + ` L100,0 Z`;
+
+                              return (
+                                <path d={areaPath} fill="#ef4444" opacity="0.5" />
+                              );
+                            })()}
+                          </svg>
+                          <div style={{ position: 'absolute', bottom: '5px', right: '10px', fontSize: '10px', color: 'var(--destructive)' }}>
+                            Max DD: {Math.min(...backtestResults.drawdown_curve.map((d: any) => d.drawdown)).toFixed(2)}%
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Monthly Returns Heatmap */}
+                    {backtestResults.monthly_returns && backtestResults.monthly_returns.length > 0 && (
+                      <div style={{ marginBottom: '20px' }}>
+                        <h4 style={{ marginBottom: '10px' }}>📅 Monthly Returns</h4>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                          {backtestResults.monthly_returns.map((m: any, i: number) => (
+                            <div
+                              key={i}
+                              style={{
+                                width: '50px',
+                                padding: '6px',
+                                borderRadius: '4px',
+                                background: m.return >= 0
+                                  ? `rgba(34, 197, 94, ${Math.min(Math.abs(m.return) / 10, 1)})`
+                                  : `rgba(239, 68, 68, ${Math.min(Math.abs(m.return) / 10, 1)})`,
+                                textAlign: 'center',
+                                fontSize: '10px'
+                              }}
+                              title={`${m.month}: ${m.return.toFixed(2)}%`}
+                            >
+                              <div style={{ color: 'var(--muted-foreground)', fontSize: '8px' }}>{m.month?.slice(5, 7) || ''}</div>
+                              <div style={{ fontWeight: 'bold', color: m.return >= 0 ? '#22c55e' : '#ef4444' }}>
+                                {m.return >= 0 ? '+' : ''}{m.return.toFixed(1)}%
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Trade Statistics - for simple backtest format */}
+                    {backtestResults.trades && (
+                      <>
+                        <h4 style={{ marginTop: '20px', marginBottom: '15px' }}>Trade Statistics</h4>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '10px', marginBottom: '20px' }}>
+                          <div>
+                            <div style={{ fontSize: '11px', color: 'var(--muted-foreground)' }}>Total Trades</div>
+                            <div style={{ fontSize: '16px', fontWeight: 'bold' }}>{backtestResults.trades.total}</div>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '11px', color: 'var(--muted-foreground)' }}>Win Rate</div>
+                            <div style={{ fontSize: '16px', fontWeight: 'bold', color: backtestResults.trades.win_rate_pct >= 50 ? '#22c55e' : 'var(--destructive)' }}>
+                              {backtestResults.trades.win_rate_pct?.toFixed(1)}%
+                            </div>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '11px', color: 'var(--muted-foreground)' }}>Winning</div>
+                            <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#22c55e' }}>{backtestResults.trades.winning}</div>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '11px', color: 'var(--muted-foreground)' }}>Losing</div>
+                            <div style={{ fontSize: '16px', fontWeight: 'bold', color: 'var(--destructive)' }}>{backtestResults.trades.losing}</div>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '11px', color: 'var(--muted-foreground)' }}>Avg Win</div>
+                            <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#22c55e' }}>+{backtestResults.trades.avg_win_pct?.toFixed(2)}%</div>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '11px', color: 'var(--muted-foreground)' }}>Avg Loss</div>
+                            <div style={{ fontSize: '16px', fontWeight: 'bold', color: 'var(--destructive)' }}>{backtestResults.trades.avg_loss_pct?.toFixed(2)}%</div>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '11px', color: 'var(--muted-foreground)' }}>Profit Factor</div>
+                            <div style={{ fontSize: '16px', fontWeight: 'bold', color: backtestResults.trades.profit_factor >= 1.5 ? '#22c55e' : backtestResults.trades.profit_factor >= 1 ? '#f59e0b' : 'var(--destructive)' }}>
+                              {backtestResults.trades.profit_factor?.toFixed(2)}
+                            </div>
+                          </div>
+                        </div>
+                      </>
+                    )}
+
+                    {/* VectorBT Trade Info */}
+                    {backtestResults.total_trades !== undefined && !backtestResults.trades && (
+                      <div style={{ display: 'flex', gap: '20px', padding: '10px', background: 'var(--accent)', borderRadius: 'var(--radius)' }}>
+                        <div>
+                          <span style={{ fontSize: '11px', color: 'var(--muted-foreground)' }}>Positions: </span>
+                          <span style={{ fontWeight: 'bold' }}>{backtestResults.total_trades}</span>
+                        </div>
+                        {(backtestResults.win_rate ?? 0) > 0 && (
+                          <div>
+                            <span style={{ fontSize: '11px', color: 'var(--muted-foreground)' }}>Win Rate: </span>
+                            <span style={{ fontWeight: 'bold', color: (backtestResults.win_rate ?? 0) >= 50 ? '#22c55e' : 'var(--destructive)' }}>{(backtestResults.win_rate ?? 0).toFixed(1)}%</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Recent Trades Table */}
+                    {backtestResults.recent_trades && backtestResults.recent_trades.length > 0 && (
+                      <>
+                        <h4 style={{ marginTop: '20px', marginBottom: '15px' }}>All Trades ({backtestResults.recent_trades.length} total)</h4>
+                        <div style={{ overflowX: 'auto', maxHeight: '400px', overflowY: 'auto' }}>
+                          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
+                            <thead style={{ position: 'sticky', top: 0, background: 'var(--muted)', zIndex: 1 }}>
+                              <tr>
+                                <th style={{ padding: '8px', textAlign: 'left' }}>Entry</th>
+                                <th style={{ padding: '8px', textAlign: 'left' }}>Exit</th>
+                                <th style={{ padding: '8px', textAlign: 'left' }}>Ticker</th>
+                                <th style={{ padding: '8px', textAlign: 'right' }}>Entry $</th>
+                                <th style={{ padding: '8px', textAlign: 'right' }}>Exit $</th>
+                                <th style={{ padding: '8px', textAlign: 'right' }}>Return</th>
+                                <th style={{ padding: '8px', textAlign: 'right' }}>P&L</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {backtestResults.recent_trades.map((trade: any, i: number) => (
+                                <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
+                                  <td style={{ padding: '6px' }}>{new Date(trade.entry_date).toLocaleDateString()}</td>
+                                  <td style={{ padding: '6px' }}>{new Date(trade.exit_date).toLocaleDateString()}</td>
+                                  <td style={{ padding: '6px', fontWeight: 'bold' }}>{trade.ticker?.replace('.BK', '')}</td>
+                                  <td style={{ padding: '6px', textAlign: 'right' }}>${trade.entry_price?.toFixed(2)}</td>
+                                  <td style={{ padding: '6px', textAlign: 'right' }}>${trade.exit_price?.toFixed(2)}</td>
+                                  <td style={{ padding: '6px', textAlign: 'right', color: trade.return_pct >= 0 ? '#22c55e' : 'var(--destructive)', fontWeight: 'bold' }}>
+                                    {trade.return_pct >= 0 ? '+' : ''}{trade.return_pct?.toFixed(2)}%
+                                  </td>
+                                  <td style={{ padding: '6px', textAlign: 'right', color: trade.pnl >= 0 ? '#22c55e' : 'var(--destructive)', fontWeight: 'bold' }}>
+                                    {trade.pnl >= 0 ? '+' : ''}${trade.pnl?.toFixed(2)}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {/* Performance Reports Section (QuantStats) */}
+                <div style={S.card}>
+                  <h2 style={{ marginTop: 0 }}>📈 Performance Reports (QuantStats)</h2>
+                  <p style={{ color: 'var(--muted-foreground)', marginBottom: '20px' }}>
+                    Generate comprehensive performance tearsheets using QuantStats. Includes advanced metrics, risk analysis, and return distributions.
+                  </p>
+
+                  <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+                    <button
+                      style={{ ...S.btn('primary'), fontSize: '14px', padding: '10px 20px' }}
+                      onClick={generateTearsheet}
+                      disabled={!backtestModel || tearsheetLoading}
+                    >
+                      {tearsheetLoading ? '⏳ Generating Report...' : '📊 Generate Performance Report'}
+                    </button>
+                    {tearsheetData && (
+                      <button
+                        style={{ ...S.btn('secondary'), fontSize: '14px', padding: '10px 20px' }}
+                        onClick={() => setTearsheetData(null)}
+                      >
+                        ✕ Clear Report
+                      </button>
+                    )}
+                  </div>
+
+                  {!backtestModel && (
+                    <div style={{ padding: '15px', background: 'var(--muted)', borderRadius: 'var(--radius)', color: 'var(--muted-foreground)' }}>
+                      ℹ️ Select a model above to generate performance reports
+                    </div>
+                  )}
+
+                  {tearsheetData && tearsheetData.metrics && (
+                    <div style={{ marginTop: '20px' }}>
+                      {/* Key Performance Metrics */}
+                      <h3 style={{ marginBottom: '15px' }}>📊 Key Metrics</h3>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '15px', marginBottom: '30px' }}>
+                        <div style={{ background: 'var(--muted)', padding: '15px', borderRadius: 'var(--radius)' }}>
+                          <div style={{ fontSize: '11px', color: 'var(--muted-foreground)', marginBottom: '5px' }}>Total Return</div>
+                          <div style={{ fontSize: '20px', fontWeight: 'bold', color: tearsheetData.metrics.total_return >= 0 ? '#22c55e' : 'var(--destructive)' }}>
+                            {tearsheetData.metrics.total_return >= 0 ? '+' : ''}{tearsheetData.metrics.total_return?.toFixed(2)}%
+                          </div>
+                        </div>
+                        <div style={{ background: 'var(--muted)', padding: '15px', borderRadius: 'var(--radius)' }}>
+                          <div style={{ fontSize: '11px', color: 'var(--muted-foreground)', marginBottom: '5px' }}>CAGR</div>
+                          <div style={{ fontSize: '20px', fontWeight: 'bold', color: tearsheetData.metrics.cagr >= 0 ? '#22c55e' : 'var(--destructive)' }}>
+                            {tearsheetData.metrics.cagr >= 0 ? '+' : ''}{tearsheetData.metrics.cagr?.toFixed(2)}%
+                          </div>
+                        </div>
+                        <div style={{ background: 'var(--muted)', padding: '15px', borderRadius: 'var(--radius)' }}>
+                          <div style={{ fontSize: '11px', color: 'var(--muted-foreground)', marginBottom: '5px' }}>Sharpe Ratio</div>
+                          <div style={{ fontSize: '20px', fontWeight: 'bold', color: tearsheetData.metrics.sharpe >= 1 ? '#22c55e' : tearsheetData.metrics.sharpe >= 0.5 ? '#f59e0b' : 'var(--destructive)' }}>
+                            {tearsheetData.metrics.sharpe?.toFixed(2)}
+                          </div>
+                        </div>
+                        <div style={{ background: 'var(--muted)', padding: '15px', borderRadius: 'var(--radius)' }}>
+                          <div style={{ fontSize: '11px', color: 'var(--muted-foreground)', marginBottom: '5px' }}>Sortino Ratio</div>
+                          <div style={{ fontSize: '20px', fontWeight: 'bold', color: tearsheetData.metrics.sortino >= 1.5 ? '#22c55e' : tearsheetData.metrics.sortino >= 0.5 ? '#f59e0b' : 'var(--destructive)' }}>
+                            {tearsheetData.metrics.sortino?.toFixed(2)}
+                          </div>
+                        </div>
+                        <div style={{ background: 'var(--muted)', padding: '15px', borderRadius: 'var(--radius)' }}>
+                          <div style={{ fontSize: '11px', color: 'var(--muted-foreground)', marginBottom: '5px' }}>Max Drawdown</div>
+                          <div style={{ fontSize: '20px', fontWeight: 'bold', color: 'var(--destructive)' }}>
+                            {tearsheetData.metrics.max_drawdown?.toFixed(2)}%
+                          </div>
+                        </div>
+                        <div style={{ background: 'var(--muted)', padding: '15px', borderRadius: 'var(--radius)' }}>
+                          <div style={{ fontSize: '11px', color: 'var(--muted-foreground)', marginBottom: '5px' }}>Calmar Ratio</div>
+                          <div style={{ fontSize: '20px', fontWeight: 'bold', color: tearsheetData.metrics.calmar >= 1 ? '#22c55e' : tearsheetData.metrics.calmar >= 0.5 ? '#f59e0b' : 'var(--muted-foreground)' }}>
+                            {tearsheetData.metrics.calmar?.toFixed(2)}
+                          </div>
+                        </div>
+                        <div style={{ background: 'var(--muted)', padding: '15px', borderRadius: 'var(--radius)' }}>
+                          <div style={{ fontSize: '11px', color: 'var(--muted-foreground)', marginBottom: '5px' }}>Win Rate</div>
+                          <div style={{ fontSize: '20px', fontWeight: 'bold', color: tearsheetData.metrics.win_rate >= 55 ? '#22c55e' : tearsheetData.metrics.win_rate >= 45 ? '#f59e0b' : 'var(--destructive)' }}>
+                            {tearsheetData.metrics.win_rate?.toFixed(1)}%
+                          </div>
+                        </div>
+                        <div style={{ background: 'var(--muted)', padding: '15px', borderRadius: 'var(--radius)' }}>
+                          <div style={{ fontSize: '11px', color: 'var(--muted-foreground)', marginBottom: '5px' }}>Volatility</div>
+                          <div style={{ fontSize: '20px', fontWeight: 'bold' }}>
+                            {tearsheetData.metrics.volatility?.toFixed(2)}%
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Risk Metrics */}
+                      <h3 style={{ marginBottom: '15px' }}>⚠️ Risk Metrics</h3>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '15px', marginBottom: '30px' }}>
+                        <div style={{ background: 'var(--muted)', padding: '12px', borderRadius: 'var(--radius)' }}>
+                          <div style={{ fontSize: '11px', color: 'var(--muted-foreground)' }}>VaR (95%)</div>
+                          <div style={{ fontSize: '16px', fontWeight: 'bold' }}>{tearsheetData.metrics.var_95?.toFixed(2)}%</div>
+                        </div>
+                        <div style={{ background: 'var(--muted)', padding: '12px', borderRadius: 'var(--radius)' }}>
+                          <div style={{ fontSize: '11px', color: 'var(--muted-foreground)' }}>CVaR (95%)</div>
+                          <div style={{ fontSize: '16px', fontWeight: 'bold' }}>{tearsheetData.metrics.cvar_95?.toFixed(2)}%</div>
+                        </div>
+                        <div style={{ background: 'var(--muted)', padding: '12px', borderRadius: 'var(--radius)' }}>
+                          <div style={{ fontSize: '11px', color: 'var(--muted-foreground)' }}>Best Day</div>
+                          <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#22c55e' }}>+{tearsheetData.metrics.best_day?.toFixed(2)}%</div>
+                        </div>
+                        <div style={{ background: 'var(--muted)', padding: '12px', borderRadius: 'var(--radius)' }}>
+                          <div style={{ fontSize: '11px', color: 'var(--muted-foreground)' }}>Worst Day</div>
+                          <div style={{ fontSize: '16px', fontWeight: 'bold', color: 'var(--destructive)' }}>{tearsheetData.metrics.worst_day?.toFixed(2)}%</div>
+                        </div>
+                        <div style={{ background: 'var(--muted)', padding: '12px', borderRadius: 'var(--radius)' }}>
+                          <div style={{ fontSize: '11px', color: 'var(--muted-foreground)' }}>Profit Factor</div>
+                          <div style={{ fontSize: '16px', fontWeight: 'bold' }}>{tearsheetData.metrics.profit_factor?.toFixed(2)}</div>
+                        </div>
+                        <div style={{ background: 'var(--muted)', padding: '12px', borderRadius: 'var(--radius)' }}>
+                          <div style={{ fontSize: '11px', color: 'var(--muted-foreground)' }}>Payoff Ratio</div>
+                          <div style={{ fontSize: '16px', fontWeight: 'bold' }}>{tearsheetData.metrics.payoff_ratio?.toFixed(2)}</div>
+                        </div>
+                      </div>
+
+                      {/* Monthly Returns */}
+                      {tearsheetData.monthly_returns && tearsheetData.monthly_returns.length > 0 && (
+                        <>
+                          <h3 style={{ marginBottom: '15px' }}>📅 Monthly Returns</h3>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '30px' }}>
+                            {tearsheetData.monthly_returns.slice(-12).map((m: any, i: number) => (
+                              <div
+                                key={i}
+                                style={{
+                                  padding: '8px 12px',
+                                  borderRadius: 'var(--radius)',
+                                  background: m.return >= 0 ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+                                  border: `1px solid ${m.return >= 0 ? '#22c55e' : '#ef4444'}`,
+                                  textAlign: 'center',
+                                  minWidth: '70px'
+                                }}
+                              >
+                                <div style={{ fontSize: '10px', color: 'var(--muted-foreground)' }}>
+                                  {new Date(m.month).toLocaleDateString('en-US', { month: 'short', year: '2-digit' })}
+                                </div>
+                                <div style={{ fontSize: '12px', fontWeight: 'bold', color: m.return >= 0 ? '#22c55e' : '#ef4444' }}>
+                                  {m.return >= 0 ? '+' : ''}{m.return?.toFixed(1)}%
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </>
+                      )}
+
+                      {/* Equity Curve Summary */}
+                      {tearsheetData.equity_curve && tearsheetData.equity_curve.length > 0 && (
+                        <>
+                          <h3 style={{ marginBottom: '15px' }}>📈 Equity Curve</h3>
+                          <div style={{ display: 'flex', gap: '20px', marginBottom: '20px' }}>
+                            <div>
+                              <span style={{ fontSize: '12px', color: 'var(--muted-foreground)' }}>Start: </span>
+                              <span style={{ fontWeight: 'bold' }}>${tearsheetData.equity_curve[0]?.value?.toLocaleString()}</span>
+                            </div>
+                            <div>
+                              <span style={{ fontSize: '12px', color: 'var(--muted-foreground)' }}>End: </span>
+                              <span style={{ fontWeight: 'bold' }}>${tearsheetData.equity_curve[tearsheetData.equity_curve.length - 1]?.value?.toLocaleString()}</span>
+                            </div>
+                            <div>
+                              <span style={{ fontSize: '12px', color: 'var(--muted-foreground)' }}>Period: </span>
+                              <span style={{ fontWeight: 'bold' }}>{tearsheetData.equity_curve[0]?.date} to {tearsheetData.equity_curve[tearsheetData.equity_curve.length - 1]?.date}</span>
+                            </div>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+
+            {/* ADVANCED FEATURES */}
+            {tab === 'advanced' && (
+              <>
+                {/* Signal Combiner */}
+                {advancedSubTab === 'combiner' && (
+                  <div style={S.card}>
+                    <h2 style={{ marginTop: 0 }}>🔗 Signal Combiner</h2>
+                    <p style={{ color: 'var(--muted-foreground)', marginBottom: '20px' }}>Run multiple models and find stocks with confirmation from multiple signals. Higher confidence = better signals.</p>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '15px', marginBottom: '20px' }}>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', fontWeight: 'bold' }}>Universe</label>
+                        <select style={{ ...S.select, width: '100%' }} value={signalCombinerUniverse} onChange={e => setSignalCombinerUniverse(e.target.value)}>
+                          <optgroup label="Built-in">{universes.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}</optgroup>
+                          {customUniverses.length > 0 && <optgroup label="Custom">{customUniverses.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}</optgroup>}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', fontWeight: 'bold' }}>Min Confirmation</label>
+                        <input type="number" style={S.input} value={signalCombinerMinConf} onChange={e => setSignalCombinerMinConf(Number(e.target.value))} min={1} max={20} />
+                        <small style={{ color: 'var(--muted-foreground)', fontSize: '11px' }}>How many models must agree</small>
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', fontWeight: 'bold' }}>Category (Optional)</label>
+                        <select style={{ ...S.select, width: '100%' }} value={signalCombinerCategory} onChange={e => setSignalCombinerCategory(e.target.value)}>
+                          <option value="">All Models</option>
+                          <option value="technical">Technical Only</option>
+                          <option value="fundamental">Fundamental Only</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <button style={{ ...S.btn('primary') }} onClick={runSignalCombiner} disabled={signalCombinerRunning}>
+                      {signalCombinerRunning ? '⏳ Running...' : '▶ Run Signal Combiner'}
+                    </button>
+
+                    {signalCombinerResults && (
+                      <div style={{ marginTop: '20px', padding: '15px', background: 'var(--muted)', borderRadius: 'var(--radius)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                          <h4 style={{ marginTop: 0 }}>Results ({signalCombinerResults.total_models_analyzed || 0} models analyzed)</h4>
+                          <button style={{ ...S.btn('primary'), fontSize: '12px', padding: '6px 12px' }} onClick={() => downloadSignalCombinerPDF(signalCombinerResults)}>
+                            📄 Download PDF
+                          </button>
+                        </div>
+
+                        {signalCombinerResults.strong_buy_signals && signalCombinerResults.strong_buy_signals.length > 0 && (
+                          <div style={{ marginBottom: '20px' }}>
+                            <h5 style={{ color: '#22c55e', marginBottom: '10px' }}>🟢 Strong Buy Signals ({signalCombinerResults.strong_buy_signals.length})</h5>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '10px' }}>
+                              {signalCombinerResults.strong_buy_signals.map((s: any, i: number) => (
+                                <div key={i} style={{ background: 'white', padding: '10px', borderRadius: '5px', fontSize: '12px' }}>
+                                  <div style={{ fontWeight: 'bold', marginBottom: '5px' }}>{s.ticker.replace('.BK', '')}</div>
+                                  <div style={{ color: 'var(--muted-foreground)' }}>{s.confirmations} confirmations • Score: {s.avg_score}</div>
+                                  <div style={{ fontSize: '11px', color: 'var(--muted-foreground)', marginTop: '3px' }}>{s.models?.join(', ')}</div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {signalCombinerResults.moderate_buy_signals && signalCombinerResults.moderate_buy_signals.length > 0 && (
+                          <div style={{ marginBottom: '20px' }}>
+                            <h5 style={{ color: '#ffc107', marginBottom: '10px' }}>🟡 Moderate Buy Signals ({signalCombinerResults.moderate_buy_signals.length})</h5>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '10px' }}>
+                              {signalCombinerResults.moderate_buy_signals.slice(0, 10).map((s: any, i: number) => (
+                                <div key={i} style={{ background: 'white', padding: '10px', borderRadius: '5px', fontSize: '12px' }}>
+                                  <div style={{ fontWeight: 'bold', marginBottom: '5px' }}>{s.ticker.replace('.BK', '')}</div>
+                                  <div style={{ color: 'var(--muted-foreground)' }}>{s.confirmations} confirmations • Score: {s.avg_score}</div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {signalCombinerResults.strong_sell_signals && signalCombinerResults.strong_sell_signals.length > 0 && (
+                          <div>
+                            <h5 style={{ color: 'var(--destructive)', marginBottom: '10px' }}>🔴 Strong Sell Signals ({signalCombinerResults.strong_sell_signals.length})</h5>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '10px' }}>
+                              {signalCombinerResults.strong_sell_signals.map((s: any, i: number) => (
+                                <div key={i} style={{ background: 'white', padding: '10px', borderRadius: '5px', fontSize: '12px' }}>
+                                  <div style={{ fontWeight: 'bold', marginBottom: '5px' }}>{s.ticker.replace('.BK', '')}</div>
+                                  <div style={{ color: 'var(--muted-foreground)' }}>{s.confirmations} confirmations • Score: {s.avg_score}</div>
+                                  <div style={{ fontSize: '11px', color: 'var(--muted-foreground)', marginTop: '3px' }}>{s.models?.join(', ')}</div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {(!signalCombinerResults.strong_buy_signals || signalCombinerResults.strong_buy_signals.length === 0) &&
+                          (!signalCombinerResults.moderate_buy_signals || signalCombinerResults.moderate_buy_signals.length === 0) &&
+                          (!signalCombinerResults.strong_sell_signals || signalCombinerResults.strong_sell_signals.length === 0) && (
+                            <p style={{ color: 'var(--muted-foreground)', fontStyle: 'italic' }}>No signals found with the specified confirmation threshold. Try lowering the minimum confirmation.</p>
+                          )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Sector Rotation */}
+                {advancedSubTab === 'sector' && (
+                  <div style={S.card}>
+                    <h2 style={{ marginTop: 0 }}>🔄 Sector Rotation</h2>
+                    <p style={{ color: 'var(--muted-foreground)', marginBottom: '20px' }}>Identify which sectors are strongest/weakest for rotation strategies.</p>
+
+                    <div style={{ display: 'flex', gap: '15px', marginBottom: '20px', alignItems: 'flex-end' }}>
+                      <div style={{ flex: 1 }}>
+                        <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', fontWeight: 'bold' }}>Universe</label>
+                        <select style={{ ...S.select, width: '100%' }} value={sectorRotationUniverse} onChange={e => setSectorRotationUniverse(e.target.value)}>
+                          <optgroup label="Built-in">{universes.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}</optgroup>
+                          {customUniverses.length > 0 && <optgroup label="Custom">{customUniverses.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}</optgroup>}
+                        </select>
+                      </div>
+                      <button style={{ ...S.btn('primary') }} onClick={runSectorRotation} disabled={sectorRotationRunning}>
+                        {sectorRotationRunning ? '⏳ Analyzing...' : '▶ Analyze Sectors'}
+                      </button>
+                    </div>
+
+                    {sectorRotationResults && (
+                      <div style={{ marginTop: '20px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '15px' }}>
+                          <button style={{ ...S.btn('primary'), fontSize: '12px', padding: '6px 12px' }} onClick={() => downloadSectorRotationPDF(sectorRotationResults)}>
+                            📄 Download PDF
+                          </button>
+                        </div>
+
+                        {sectorRotationResults.rotation_recommendation && (
+                          <div style={{ padding: '15px', background: '#e3f2fd', borderRadius: '8px', marginBottom: '20px' }}>
+                            <h4 style={{ marginTop: 0 }}>💡 Rotation Recommendation</h4>
+                            <p style={{ margin: '5px 0', fontWeight: 'bold' }}>{sectorRotationResults.rotation_recommendation.summary}</p>
+                            <div style={{ marginTop: '10px', fontSize: '12px' }}>
+                              <div><strong>Overweight:</strong> {sectorRotationResults.rotation_recommendation.overweight?.join(', ') || 'None'}</div>
+                              <div><strong>Underweight:</strong> {sectorRotationResults.rotation_recommendation.underweight?.join(', ') || 'None'}</div>
+                            </div>
+                          </div>
+                        )}
+
+                        {sectorRotationResults.sector_rankings && sectorRotationResults.sector_rankings.length > 0 && (
+                          <div>
+                            <h4>Sector Rankings</h4>
+                            <div style={{ overflowX: 'auto' }}>
+                              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                                <thead>
+                                  <tr style={{ background: '#f8f9fa' }}>
+                                    <th style={{ padding: '8px', textAlign: 'left' }}>Rank</th>
+                                    <th style={{ padding: '8px', textAlign: 'left' }}>Sector</th>
+                                    <th style={{ padding: '8px', textAlign: 'right' }}>Momentum</th>
+                                    <th style={{ padding: '8px', textAlign: 'right' }}>1W Return</th>
+                                    <th style={{ padding: '8px', textAlign: 'right' }}>1M Return</th>
+                                    <th style={{ padding: '8px', textAlign: 'right' }}>3M Return</th>
+                                    <th style={{ padding: '8px', textAlign: 'center' }}>Signal</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {sectorRotationResults.sector_rankings.map((s: any, i: number) => (
+                                    <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
+                                      <td style={{ padding: '8px', fontWeight: 'bold' }}>#{s.rank}</td>
+                                      <td style={{ padding: '8px', fontWeight: 'bold' }}>{s.sector}</td>
+                                      <td style={{ padding: '8px', textAlign: 'right' }}>{s.momentum_score.toFixed(2)}</td>
+                                      <td style={{ padding: '8px', textAlign: 'right', color: s.return_1w >= 0 ? '#22c55e' : 'var(--destructive)' }}>
+                                        {s.return_1w >= 0 ? '+' : ''}{s.return_1w.toFixed(2)}%
+                                      </td>
+                                      <td style={{ padding: '8px', textAlign: 'right', color: s.return_1m >= 0 ? '#22c55e' : 'var(--destructive)' }}>
+                                        {s.return_1m >= 0 ? '+' : ''}{s.return_1m.toFixed(2)}%
+                                      </td>
+                                      <td style={{ padding: '8px', textAlign: 'right', color: s.return_3m >= 0 ? '#22c55e' : 'var(--destructive)' }}>
+                                        {s.return_3m >= 0 ? '+' : ''}{s.return_3m.toFixed(2)}%
+                                      </td>
+                                      <td style={{ padding: '8px', textAlign: 'center' }}>
+                                        <span style={{
+                                          padding: '3px 8px',
+                                          borderRadius: '3px',
+                                          background: s.signal === 'BUY' ? '#28a745' : s.signal === 'SELL' ? '#dc3545' : '#ffc107',
+                                          color: 'white',
+                                          fontSize: '11px',
+                                          fontWeight: 'bold'
+                                        }}>
+                                          {s.signal}
+                                        </span>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Market Regime Detection */}
+                {advancedSubTab === 'regime' && (
+                  <div style={S.card}>
+                    <h2 style={{ marginTop: 0 }}>📊 Market Regime Detection</h2>
+                    <p style={{ color: 'var(--muted-foreground)', marginBottom: '20px' }}>Identify current market conditions (Bull/Bear/Neutral) to adjust your strategy accordingly.</p>
+
+                    <div style={{ display: 'flex', gap: '15px', marginBottom: '20px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', fontWeight: 'bold' }}>Index</label>
+                        <select style={{ ...S.select, width: '150px' }} value={marketRegimeIndex} onChange={e => setMarketRegimeIndex(e.target.value)}>
+                          <optgroup label="US Markets">
+                            <option value="SPY">SPY (S&P 500)</option>
+                            <option value="QQQ">QQQ (Nasdaq)</option>
+                            <option value="IWM">IWM (Russell 2000)</option>
+                            <option value="DIA">DIA (Dow Jones)</option>
+                          </optgroup>
+                          <optgroup label="Thai Markets">
+                            <option value="SET.BK">SET Index</option>
+                            <option value="^SET.BK">SET (Alt)</option>
+                          </optgroup>
+                        </select>
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', fontWeight: 'bold' }}>Universe</label>
+                        <select style={{ ...S.select, width: '150px' }} value={marketRegimeUniverse} onChange={e => setMarketRegimeUniverse(e.target.value)}>
+                          <optgroup label="Built-in">{universes.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}</optgroup>
+                        </select>
+                      </div>
+                      <button style={{ ...S.btn('primary') }} onClick={runMarketRegime} disabled={marketRegimeRunning}>
+                        {marketRegimeRunning ? '⏳ Detecting...' : '▶ Detect Regime'}
+                      </button>
+                    </div>
+
+                    {marketRegimeResults && (
+                      <div style={{ marginTop: '20px' }}>
+                        {/* PDF Export Button */}
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '15px' }}>
+                          <button style={{ ...S.btn('primary'), fontSize: '12px', padding: '6px 12px' }} onClick={downloadMarketRegimePDF}>
+                            📄 Export PDF
+                          </button>
+                        </div>
+                        {/* Regime Badge */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '20px' }}>
+                          <div style={{
+                            padding: '15px 30px',
+                            borderRadius: '10px',
+                            background: marketRegimeResults.regime === 'BULL' ? '#22c55e' : marketRegimeResults.regime === 'BEAR' ? '#ef4444' : '#f59e0b',
+                            color: 'white',
+                            fontSize: '24px',
+                            fontWeight: 'bold'
+                          }}>
+                            {marketRegimeResults.regime === 'BULL' ? '🐂' : marketRegimeResults.regime === 'BEAR' ? '🐻' : '➡️'} {marketRegimeResults.regime}
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '14px', color: 'var(--muted-foreground)' }}>Volatility Regime</div>
+                            <div style={{ fontSize: '18px', fontWeight: 'bold', color: marketRegimeResults.volatility_regime === 'HIGH' ? '#ef4444' : marketRegimeResults.volatility_regime === 'LOW' ? '#22c55e' : '#f59e0b' }}>
+                              {marketRegimeResults.volatility_regime}
+                            </div>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '14px', color: 'var(--muted-foreground)' }}>Risk Level</div>
+                            <div style={{ fontSize: '18px', fontWeight: 'bold' }}>{marketRegimeResults.risk_level}</div>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '14px', color: 'var(--muted-foreground)' }}>Recommended Exposure</div>
+                            <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#3b82f6' }}>{marketRegimeResults.recommended_exposure}%</div>
+                          </div>
+                        </div>
+
+                        {/* Recommendation */}
+                        {marketRegimeResults.recommendation && (
+                          <div style={{ padding: '15px', background: 'var(--accent)', borderRadius: 'var(--radius)', marginBottom: '15px' }}>
+                            <h4 style={{ margin: '0 0 10px 0' }}>💡 Recommendation</h4>
+                            <p style={{ margin: 0 }}>{marketRegimeResults.recommendation}</p>
+                          </div>
+                        )}
+
+                        {/* Signals Grid */}
+                        {marketRegimeResults.signals && (
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '10px', marginTop: '15px' }}>
+                            {Object.entries(marketRegimeResults.signals).map(([key, value]: [string, any]) => (
+                              <div key={key} style={{ padding: '10px', background: 'var(--muted)', borderRadius: 'var(--radius)', textAlign: 'center' }}>
+                                <div style={{ fontSize: '11px', color: 'var(--muted-foreground)', marginBottom: '5px' }}>{key.replace(/_/g, ' ')}</div>
+                                <div style={{ fontSize: '16px', fontWeight: 'bold', color: value ? '#22c55e' : '#ef4444' }}>
+                                  {typeof value === 'boolean' ? (value ? '✓' : '✗') : value}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Scheduled Scans */}
+                {advancedSubTab === 'scheduled' && (
+                  <div style={S.card}>
+                    <h2 style={{ marginTop: 0 }}>⏰ Scheduled Scans</h2>
+                    <p style={{ color: 'var(--muted-foreground)', marginBottom: '20px' }}>Set up automatic daily scans to run models at specific times.</p>
+
+                    {/* Create New Scan */}
+                    <div style={{ background: 'var(--muted)', padding: '15px', borderRadius: 'var(--radius)', marginBottom: '20px' }}>
+                      <h4 style={{ margin: '0 0 15px 0' }}>Create New Scheduled Scan</h4>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '15px', marginBottom: '15px' }}>
+                        <div>
+                          <label style={{ display: 'block', marginBottom: '5px', fontSize: '12px', fontWeight: 'bold' }}>Model</label>
+                          <select style={{ ...S.select, width: '100%' }} value={newScanModel} onChange={e => setNewScanModel(e.target.value)}>
+                            <option value="">Select model...</option>
+                            <optgroup label="Technical">
+                              {models.filter(m => m.category === 'Technical').map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                            </optgroup>
+                            <optgroup label="Fundamental">
+                              {models.filter(m => m.category === 'Fundamental').map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                            </optgroup>
+                            <optgroup label="Quantitative">
+                              {models.filter(m => m.category === 'Quantitative').map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                            </optgroup>
+                          </select>
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', marginBottom: '5px', fontSize: '12px', fontWeight: 'bold' }}>Universe</label>
+                          <select style={{ ...S.select, width: '100%' }} value={newScanUniverse} onChange={e => setNewScanUniverse(e.target.value)}>
+                            <optgroup label="Built-in">{universes.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}</optgroup>
+                            {customUniverses.length > 0 && <optgroup label="Custom">{customUniverses.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}</optgroup>}
+                          </select>
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', marginBottom: '5px', fontSize: '12px', fontWeight: 'bold' }}>Time (Market Hours)</label>
+                          <input type="time" style={{ ...S.input, marginBottom: 0 }} value={newScanTime} onChange={e => setNewScanTime(e.target.value)} />
+                        </div>
+                      </div>
+                      <div style={{ marginBottom: '15px' }}>
+                        <label style={{ display: 'block', marginBottom: '5px', fontSize: '12px', fontWeight: 'bold' }}>Days</label>
+                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                          {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => (
+                            <button
+                              key={day}
+                              style={{
+                                padding: '5px 10px',
+                                borderRadius: 'var(--radius)',
+                                border: '1px solid var(--border)',
+                                background: newScanDays.includes(day) ? 'var(--primary)' : 'transparent',
+                                color: newScanDays.includes(day) ? 'white' : 'var(--foreground)',
+                                cursor: 'pointer',
+                                fontSize: '12px'
+                              }}
+                              onClick={() => {
+                                if (newScanDays.includes(day)) {
+                                  setNewScanDays(newScanDays.filter(d => d !== day));
+                                } else {
+                                  setNewScanDays([...newScanDays, day]);
+                                }
+                              }}
+                            >
+                              {day}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <button style={S.btn('success')} onClick={createScheduledScan}>
+                        ➕ Create Scheduled Scan
+                      </button>
+                    </div>
+
+                    {/* Existing Scans */}
+                    <h4>Active Scans ({scheduledScans.length})</h4>
+                    {scheduledScans.length === 0 ? (
+                      <p style={{ color: 'var(--muted-foreground)', fontStyle: 'italic' }}>No scheduled scans yet. Create one above to automate your daily analysis.</p>
+                    ) : (
+                      <div style={{ display: 'grid', gap: '10px' }}>
+                        {scheduledScans.map((scan: any) => (
+                          <div key={scan.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', background: 'var(--muted)', borderRadius: 'var(--radius)' }}>
+                            <div>
+                              <div style={{ fontWeight: 'bold' }}>{scan.model_name || scan.model_id}</div>
+                              <div style={{ fontSize: '12px', color: 'var(--muted-foreground)' }}>
+                                {scan.universe} • {scan.schedule_time} • {scan.days?.join(', ')}
+                              </div>
+                            </div>
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                              <button
+                                style={{
+                                  padding: '5px 10px',
+                                  borderRadius: 'var(--radius)',
+                                  border: 'none',
+                                  background: scan.enabled ? '#22c55e' : 'var(--muted-foreground)',
+                                  color: 'white',
+                                  cursor: 'pointer',
+                                  fontSize: '11px'
+                                }}
+                                onClick={() => toggleScheduledScan(scan.id, !scan.enabled)}
+                              >
+                                {scan.enabled ? 'ON' : 'OFF'}
+                              </button>
+                              <button style={{ ...S.btn('danger'), fontSize: '11px', padding: '5px 10px' }} onClick={() => deleteScheduledScan(scan.id)}>
+                                🗑️
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Enhanced Signal Combiner */}
+                {advancedSubTab === 'enhanced-combiner' && (
+                  <div style={S.card}>
+                    <h2 style={{ marginTop: 0 }}>🎯 Enhanced Signal Combiner</h2>
+                    <p style={{ color: 'var(--muted-foreground)', marginBottom: '20px' }}>Select specific models, set weights, and combine signals with rich context explaining WHY each signal was generated.</p>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '15px', marginBottom: '20px' }}>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', fontWeight: 'bold' }}>Universe</label>
+                        <select style={{ ...S.select, width: '100%' }} value={enhancedCombinerUniverse} onChange={e => setEnhancedCombinerUniverse(e.target.value)}>
+                          <optgroup label="Built-in">{universes.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}</optgroup>
+                          {customUniverses.length > 0 && <optgroup label="Custom">{customUniverses.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}</optgroup>}
+                        </select>
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', fontWeight: 'bold' }}>Combine Method</label>
+                        <select style={{ ...S.select, width: '100%' }} value={enhancedCombinerMethod} onChange={e => setEnhancedCombinerMethod(e.target.value)}>
+                          <option value="weighted">Weighted Average</option>
+                          <option value="majority">Majority Vote</option>
+                          <option value="unanimous">Unanimous Only</option>
+                          <option value="any">Any Signal</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', fontWeight: 'bold' }}>Min Models</label>
+                        <input type="number" style={S.input} value={enhancedCombinerMinModels} onChange={e => setEnhancedCombinerMinModels(Number(e.target.value))} min={1} max={10} />
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+                        <button style={{ ...S.btn('primary'), width: '100%' }} onClick={runEnhancedCombiner} disabled={enhancedCombinerRunning}>
+                          {enhancedCombinerRunning ? '⏳ Running...' : '▶ Combine Signals'}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Model Selection */}
+                    <div style={{ marginBottom: '20px' }}>
+                      <label style={{ display: 'block', marginBottom: '10px', fontSize: '13px', fontWeight: 'bold' }}>Select Models (leave empty for all)</label>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                        {models.map(m => (
+                          <button
+                            key={m.id}
+                            style={{
+                              padding: '5px 12px',
+                              borderRadius: 'var(--radius)',
+                              border: '1px solid var(--border)',
+                              background: enhancedCombinerModels.includes(m.id) ? 'var(--primary)' : 'transparent',
+                              color: enhancedCombinerModels.includes(m.id) ? 'white' : 'var(--foreground)',
+                              cursor: 'pointer',
+                              fontSize: '12px'
+                            }}
+                            onClick={() => {
+                              if (enhancedCombinerModels.includes(m.id)) {
+                                setEnhancedCombinerModels(enhancedCombinerModels.filter(id => id !== m.id));
+                              } else {
+                                setEnhancedCombinerModels([...enhancedCombinerModels, m.id]);
+                              }
+                            }}
+                          >
+                            {m.name}
+                          </button>
+                        ))}
+                      </div>
+                      {enhancedCombinerModels.length > 0 && (
+                        <button style={{ marginTop: '10px', fontSize: '11px', color: 'var(--muted-foreground)', background: 'none', border: 'none', cursor: 'pointer' }} onClick={() => setEnhancedCombinerModels([])}>
+                          Clear selection
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Results */}
+                    {enhancedCombinerResults && (
+                      <div style={{ marginTop: '20px', padding: '15px', background: 'var(--muted)', borderRadius: 'var(--radius)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                          <h4 style={{ margin: 0 }}>Results: {enhancedCombinerResults.buy_count} Buy, {enhancedCombinerResults.sell_count} Sell ({enhancedCombinerResults.models_used} models)</h4>
+                          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                            <button style={{ ...S.btn('primary'), fontSize: '12px', padding: '6px 12px' }} onClick={downloadEnhancedCombinerPDF}>
+                              📄 Export PDF
+                            </button>
+                            <span style={{ padding: '4px 10px', borderRadius: '4px', background: enhancedCombinerResults.market_regime === 'BULL' ? '#22c55e' : enhancedCombinerResults.market_regime === 'BEAR' ? '#ef4444' : '#f59e0b', color: 'white', fontSize: '12px', fontWeight: 'bold' }}>
+                              {enhancedCombinerResults.market_regime}
+                            </span>
+                          </div>
+                        </div>
+
+                        {enhancedCombinerResults.signals && enhancedCombinerResults.signals.length > 0 && (
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '10px' }}>
+                            {enhancedCombinerResults.signals.map((s: any, i: number) => (
+                              <div key={i} style={{ background: 'white', padding: '12px', borderRadius: '8px', borderLeft: `4px solid ${s.final_signal === 'BUY' ? '#22c55e' : '#ef4444'}` }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                  <span style={{ fontWeight: 'bold', fontSize: '14px' }}>{s.ticker}</span>
+                                  <span style={{ padding: '2px 8px', borderRadius: '4px', background: s.final_signal === 'BUY' ? '#dcfce7' : '#fee2e2', color: s.final_signal === 'BUY' ? '#166534' : '#991b1b', fontSize: '11px', fontWeight: 'bold' }}>
+                                    {s.final_signal}
+                                  </span>
+                                </div>
+                                <div style={{ fontSize: '12px', color: 'var(--muted-foreground)' }}>
+                                  <div>Confidence: {s.confidence}% ({s.confidence_label})</div>
+                                  <div>Models: {s.agreeing_models?.join(', ')}</div>
+                                </div>
+                                {s.enhanced_context?.primary_reasons && s.enhanced_context.primary_reasons.length > 0 && (
+                                  <div style={{ marginTop: '8px', fontSize: '11px', padding: '8px', background: '#f8fafc', borderRadius: '4px' }}>
+                                    <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>📌 Why:</div>
+                                    {s.enhanced_context.primary_reasons.slice(0, 2).map((r: any, j: number) => (
+                                      <div key={j}>• {r.factor}: {r.description}</div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Model Validation */}
+                {advancedSubTab === 'validation' && (
+                  <div style={S.card}>
+                    <h2 style={{ marginTop: 0 }}>📊 Model Validation</h2>
+                    <p style={{ color: 'var(--muted-foreground)', marginBottom: '20px' }}>Statistically prove which models actually work. Backtest signals and get win rates, Sharpe ratios, and statistical significance.</p>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '15px', marginBottom: '20px' }}>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', fontWeight: 'bold' }}>Model</label>
+                        <select style={{ ...S.select, width: '100%' }} value={validationModel} onChange={e => setValidationModel(e.target.value)}>
+                          <option value="">Select model...</option>
+                          {models.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', fontWeight: 'bold' }}>Universe</label>
+                        <select style={{ ...S.select, width: '100%' }} value={validationUniverse} onChange={e => setValidationUniverse(e.target.value)}>
+                          <optgroup label="Built-in">{universes.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}</optgroup>
+                        </select>
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', fontWeight: 'bold' }}>Holding Period (days)</label>
+                        <input type="number" style={S.input} value={validationHoldingPeriod} onChange={e => setValidationHoldingPeriod(Number(e.target.value))} min={1} max={252} />
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'flex-end', gap: '8px' }}>
+                        <button style={{ ...S.btn('primary'), flex: 1 }} onClick={runModelValidation} disabled={validationRunning}>
+                          {validationRunning ? '⏳...' : '▶ Validate'}
+                        </button>
+                        <button style={{ ...S.btn('secondary'), flex: 1 }} onClick={runValidateAllModels} disabled={validationAllRunning}>
+                          {validationAllRunning ? '⏳...' : '📊 All'}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Single Model Validation Results */}
+                    {validationResults && validationResults.validation && (
+                      <div style={{ marginTop: '20px', padding: '15px', background: 'var(--muted)', borderRadius: 'var(--radius)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                          <h4 style={{ margin: 0 }}>{validationResults.model_id} Validation</h4>
+                          <span style={{
+                            padding: '4px 12px',
+                            borderRadius: '4px',
+                            background: validationResults.validation.verdict?.verdict === 'EXCELLENT' ? '#22c55e' :
+                              validationResults.validation.verdict?.verdict === 'GOOD' ? '#3b82f6' :
+                                validationResults.validation.verdict?.verdict === 'MARGINAL' ? '#f59e0b' : '#ef4444',
+                            color: 'white',
+                            fontSize: '12px',
+                            fontWeight: 'bold'
+                          }}>
+                            {validationResults.validation.verdict?.verdict || 'N/A'}
+                          </span>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', marginBottom: '15px' }}>
+                          <div style={{ background: 'white', padding: '10px', borderRadius: '6px', textAlign: 'center' }}>
+                            <div style={{ fontSize: '11px', color: 'var(--muted-foreground)' }}>Win Rate</div>
+                            <div style={{ fontSize: '18px', fontWeight: 'bold', color: (validationResults.validation.performance?.win_rate || 0) > 50 ? '#22c55e' : '#ef4444' }}>
+                              {(validationResults.validation.performance?.win_rate || 0).toFixed(1)}%
+                            </div>
+                          </div>
+                          <div style={{ background: 'white', padding: '10px', borderRadius: '6px', textAlign: 'center' }}>
+                            <div style={{ fontSize: '11px', color: 'var(--muted-foreground)' }}>Avg Return</div>
+                            <div style={{ fontSize: '18px', fontWeight: 'bold', color: (validationResults.validation.performance?.avg_return || 0) > 0 ? '#22c55e' : '#ef4444' }}>
+                              {(validationResults.validation.performance?.avg_return || 0).toFixed(2)}%
+                            </div>
+                          </div>
+                          <div style={{ background: 'white', padding: '10px', borderRadius: '6px', textAlign: 'center' }}>
+                            <div style={{ fontSize: '11px', color: 'var(--muted-foreground)' }}>Sharpe Ratio</div>
+                            <div style={{ fontSize: '18px', fontWeight: 'bold' }}>
+                              {(validationResults.validation.risk_metrics?.sharpe_ratio || 0).toFixed(2)}
+                            </div>
+                          </div>
+                          <div style={{ background: 'white', padding: '10px', borderRadius: '6px', textAlign: 'center' }}>
+                            <div style={{ fontSize: '11px', color: 'var(--muted-foreground)' }}>P-Value</div>
+                            <div style={{ fontSize: '18px', fontWeight: 'bold', color: (validationResults.validation.statistical_significance?.p_value || 1) < 0.05 ? '#22c55e' : '#f59e0b' }}>
+                              {(validationResults.validation.statistical_significance?.p_value || 0).toFixed(4)}
+                            </div>
+                          </div>
+                        </div>
+
+                        {validationResults.validation.verdict?.reasons && (
+                          <div style={{ fontSize: '12px', color: 'var(--muted-foreground)' }}>
+                            <strong>Analysis:</strong> {validationResults.validation.verdict.reasons.join(' • ')}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* All Models Leaderboard */}
+                    {validationAllResults && validationAllResults.leaderboard && (
+                      <div style={{ marginTop: '20px', padding: '15px', background: 'var(--muted)', borderRadius: 'var(--radius)' }}>
+                        <h4 style={{ margin: '0 0 15px 0' }}>📊 Model Leaderboard ({validationAllResults.models_tested} models)</h4>
+                        <div style={{ overflowX: 'auto' }}>
+                          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                            <thead>
+                              <tr style={{ background: '#f8f9fa' }}>
+                                <th style={{ padding: '8px', textAlign: 'left' }}>Rank</th>
+                                <th style={{ padding: '8px', textAlign: 'left' }}>Model</th>
+                                <th style={{ padding: '8px', textAlign: 'center' }}>Verdict</th>
+                                <th style={{ padding: '8px', textAlign: 'right' }}>Win Rate</th>
+                                <th style={{ padding: '8px', textAlign: 'right' }}>Avg Return</th>
+                                <th style={{ padding: '8px', textAlign: 'right' }}>Sharpe</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {validationAllResults.leaderboard.slice(0, 10).map((m: any, i: number) => (
+                                <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
+                                  <td style={{ padding: '8px', fontWeight: 'bold' }}>#{i + 1}</td>
+                                  <td style={{ padding: '8px' }}>{m.model_id}</td>
+                                  <td style={{ padding: '8px', textAlign: 'center' }}>
+                                    <span style={{
+                                      padding: '2px 8px',
+                                      borderRadius: '4px',
+                                      background: m.verdict === 'EXCELLENT' ? '#22c55e' : m.verdict === 'GOOD' ? '#3b82f6' : m.verdict === 'MARGINAL' ? '#f59e0b' : '#ef4444',
+                                      color: 'white',
+                                      fontSize: '10px',
+                                      fontWeight: 'bold'
+                                    }}>
+                                      {m.verdict}
+                                    </span>
+                                  </td>
+                                  <td style={{ padding: '8px', textAlign: 'right', color: (m.win_rate || 0) > 50 ? '#22c55e' : '#ef4444' }}>
+                                    {(m.win_rate || 0).toFixed(1)}%
+                                  </td>
+                                  <td style={{ padding: '8px', textAlign: 'right', color: (m.avg_return || 0) > 0 ? '#22c55e' : '#ef4444' }}>
+                                    {(m.avg_return || 0).toFixed(2)}%
+                                  </td>
+                                  <td style={{ padding: '8px', textAlign: 'right' }}>{(m.sharpe_ratio || 0).toFixed(2)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+              </>
+            )}
+
+            {/* STATUS */}
+            {tab === 'status' && (
+              <>
+                <div style={S.card}>
+                  <h3 style={{ marginTop: 0 }}>🔌 Connection</h3>
+                  <p><span style={S.dot(connected)} /> {connected ? 'Connected to backend' : 'Not connected'}</p>
+                  <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                    <button style={S.btn('primary')} onClick={checkConn}>Test Connection</button>
+                    <button style={S.btn('secondary')} onClick={loadAll}>Reload All Data</button>
+                    <button style={S.btn('secondary')} onClick={testDataFetch}>🧪 Test Data Fetch</button>
+                    <button style={S.btn('secondary')} onClick={clearCache}>🗑️ Clear Cache</button>
+                    <button style={S.btn('secondary')} onClick={loadStatusLogs}>📋 Load System Logs</button>
+                  </div>
+                </div>
+                <div style={S.card}>
+                  <h3 style={{ marginTop: 0 }}>📋 Application Logs ({logs.length})</h3>
+                  <div style={{ maxHeight: '300px', overflow: 'auto', fontFamily: 'var(--font-mono)', fontSize: '0.75rem', borderRadius: 'var(--radius)', background: 'var(--muted)', padding: '0.5rem' }}>
+                    {logs.slice().reverse().map((l, i) => (
+                      <div key={i} style={{
+                        padding: '0.5rem',
+                        borderLeft: `3px solid ${l.type === 'error' ? 'var(--destructive)' : l.type === 'success' ? '#22c55e' : 'var(--primary)'}`,
+                        background: l.type === 'error' ? 'rgba(239, 68, 68, 0.1)' : l.type === 'success' ? 'rgba(34, 197, 94, 0.1)' : 'rgba(59, 130, 246, 0.1)',
+                        marginBottom: '0.375rem',
+                        borderRadius: 'var(--radius)',
+                        color: 'var(--foreground)'
+                      }}>
+                        <span style={{ color: 'var(--muted-foreground)', marginRight: '0.5rem' }}>[{l.time}]</span>
+                        <span style={{ color: l.type === 'error' ? 'var(--destructive)' : l.type === 'success' ? '#22c55e' : 'var(--foreground)' }}>{l.message}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <button style={{ ...S.btn('secondary'), marginTop: '10px' }} onClick={() => setLogs([])}>Clear</button>
+                </div>
+                <div style={S.card}>
+                  <h3 style={{ marginTop: 0, marginBottom: '1rem' }}>🔧 Troubleshooting</h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
+                      <span style={{ color: 'var(--primary)', fontWeight: '600', minWidth: '1.5rem' }}>1.</span>
+                      <div style={{ flex: 1, color: 'var(--foreground)' }}>
+                        Open terminal in <code style={{ background: 'var(--muted)', padding: '0.125rem 0.375rem', borderRadius: 'var(--radius)', fontFamily: 'var(--font-mono)', fontSize: '0.875rem', color: 'var(--foreground)' }}>backend</code> folder
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
+                      <span style={{ color: 'var(--primary)', fontWeight: '600', minWidth: '1.5rem' }}>2.</span>
+                      <div style={{ flex: 1, color: 'var(--foreground)' }}>
+                        Run: <code style={{ background: 'var(--muted)', padding: '0.125rem 0.375rem', borderRadius: 'var(--radius)', fontFamily: 'var(--font-mono)', fontSize: '0.875rem', color: 'var(--foreground)' }}>pip install -r requirements.txt</code>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
+                      <span style={{ color: 'var(--primary)', fontWeight: '600', minWidth: '1.5rem' }}>3.</span>
+                      <div style={{ flex: 1, color: 'var(--foreground)' }}>
+                        Run: <code style={{ background: 'var(--muted)', padding: '0.125rem 0.375rem', borderRadius: 'var(--radius)', fontFamily: 'var(--font-mono)', fontSize: '0.875rem', color: 'var(--foreground)' }}>uvicorn app.main:app --reload --port 8000</code>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
+                      <span style={{ color: 'var(--primary)', fontWeight: '600', minWidth: '1.5rem' }}>4.</span>
+                      <div style={{ flex: 1, color: 'var(--foreground)' }}>
+                        Test: <a href="http://localhost:8000/health" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)', textDecoration: 'none', borderBottom: '1px solid var(--primary)', transition: 'opacity 0.2s ease' }} onMouseEnter={(e) => e.currentTarget.style.opacity = '0.8'} onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}>http://localhost:8000/health</a>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* MODEL DETAIL */}
+            {tab === 'model-detail' && (
+              <>
+                <div style={S.card}>
+                  <h2 style={{ marginTop: 0 }}>📖 Model Documentation</h2>
+                  <p style={{ color: 'var(--muted-foreground)', marginBottom: '1rem' }}>Select a model to view detailed documentation, parameters, and usage instructions.</p>
+
+                  {Object.keys(modelDocs).length === 0 ? (
+                    <p style={{ color: 'var(--muted-foreground)' }}>Loading model documentation...</p>
+                  ) : (
+                    <>
+                      <div style={{ marginBottom: '1rem' }}>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>Select Model:</label>
+                        <select
+                          style={{ ...S.select, width: '100%', maxWidth: '400px' }}
+                          value={selDoc || ''}
+                          onChange={e => setSelDoc(e.target.value || null)}
+                        >
+                          <option value="">-- Select a model --</option>
+                          {Object.entries(modelDocs).map(([id, doc]: [string, any]) => (
+                            <option key={id} value={id}>{doc.name || id} ({doc.category || 'Unknown'})</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {selDoc && modelDocs[selDoc] && (
+                        <div style={{ borderTop: '1px solid var(--border)', paddingTop: '1rem', marginTop: '1rem' }}>
+                          {(() => {
+                            const doc = modelDocs[selDoc];
+                            return (
+                              <>
+                                <div style={{ marginBottom: '1rem' }}>
+                                  <h3 style={{ margin: '0 0 0.5rem 0', color: 'var(--foreground)' }}>{doc.name || selDoc}</h3>
+                                  <span style={{
+                                    fontSize: '0.75rem',
+                                    padding: '0.25rem 0.5rem',
+                                    borderRadius: 'var(--radius)',
+                                    background: doc.category === 'Technical' ? 'var(--accent)' : 'var(--muted)',
+                                    color: doc.category === 'Technical' ? 'var(--accent-foreground)' : 'var(--muted-foreground)'
+                                  }}>
+                                    {doc.category || 'Unknown'}
+                                  </span>
+                                </div>
+
+                                {doc.summary && (
+                                  <div style={{ marginBottom: '1rem' }}>
+                                    <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.875rem', fontWeight: '600', color: 'var(--foreground)' }}>Summary</h4>
+                                    <p style={{ color: 'var(--muted-foreground)', margin: 0, lineHeight: '1.6' }}>{cleanMarkdown(doc.summary)}</p>
+                                  </div>
+                                )}
+
+                                {doc.description && (
+                                  <div style={{ marginBottom: '1rem' }}>
+                                    <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.875rem', fontWeight: '600', color: 'var(--foreground)' }}>Description</h4>
+                                    <p style={{ color: 'var(--muted-foreground)', margin: 0, lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>{cleanMarkdown(doc.description)}</p>
+                                  </div>
+                                )}
+
+                                {doc.parameters && Object.keys(doc.parameters).length > 0 && (
+                                  <div style={{ marginBottom: '1rem' }}>
+                                    <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.875rem', fontWeight: '600', color: 'var(--foreground)' }}>Parameters</h4>
+                                    <div style={{ background: 'var(--muted)', borderRadius: 'var(--radius)', padding: '0.75rem' }}>
+                                      {Object.entries(doc.parameters).map(([key, param]: [string, any]) => (
+                                        <div key={key} style={{ marginBottom: '0.5rem', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border)' }}>
+                                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.25rem' }}>
+                                            <code style={{ background: 'var(--background)', padding: '0.125rem 0.375rem', borderRadius: 'var(--radius)', fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: 'var(--foreground)' }}>{key}</code>
+                                            {param.default !== undefined && (
+                                              <span style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>Default: {String(param.default)}</span>
+                                            )}
+                                          </div>
+                                          {param.description && (
+                                            <p style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)', margin: 0 }}>{cleanMarkdown(String(param.description))}</p>
+                                          )}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {doc.signals && (
+                                  <div style={{ marginBottom: '1rem' }}>
+                                    <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.875rem', fontWeight: '600', color: 'var(--foreground)' }}>Signals</h4>
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem' }}>
+                                      {doc.signals.buy && (
+                                        <div style={{ background: 'rgba(34, 197, 94, 0.1)', border: '1px solid #22c55e', borderRadius: 'var(--radius)', padding: '0.75rem' }}>
+                                          <div style={{ fontSize: '0.75rem', fontWeight: '600', color: '#22c55e', marginBottom: '0.25rem' }}>🟢 Buy Signal</div>
+                                          <p style={{ fontSize: '0.75rem', color: 'var(--foreground)', margin: 0 }}>{cleanMarkdown(doc.signals.buy)}</p>
+                                        </div>
+                                      )}
+                                      {doc.signals.sell && (
+                                        <div style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid var(--destructive)', borderRadius: 'var(--radius)', padding: '0.75rem' }}>
+                                          <div style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--destructive)', marginBottom: '0.25rem' }}>🔴 Sell Signal</div>
+                                          <p style={{ fontSize: '0.75rem', color: 'var(--foreground)', margin: 0 }}>{cleanMarkdown(doc.signals.sell)}</p>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {doc.references && doc.references.length > 0 && (
+                                  <div style={{ marginBottom: '1rem' }}>
+                                    <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.875rem', fontWeight: '600', color: 'var(--foreground)' }}>References</h4>
+                                    <ul style={{ margin: 0, paddingLeft: '1.25rem', color: 'var(--muted-foreground)', fontSize: '0.875rem' }}>
+                                      {doc.references.map((ref: string, i: number) => (
+                                        <li key={i} style={{ marginBottom: '0.25rem' }}>{ref}</li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                )}
+                              </>
+                            );
+                          })()}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </>
+            )}
+
+            {/* SETTINGS */}
+            {tab === 'settings' && (
+              <>
+                <div style={S.card}>
+                  <h2 style={{ marginTop: 0 }}>⚙️ Settings</h2>
+                  <p style={{ color: 'var(--muted-foreground)', marginBottom: '1.5rem' }}>Configure application preferences and default values.</p>
+
+                  <div style={{ marginBottom: '1.5rem' }}>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500', color: 'var(--foreground)' }}>
+                      Top N Signals
+                    </label>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)', margin: '0 0 0.75rem 0' }}>
+                      Number of top signals to display when running models (default: 10)
+                    </p>
+                    <select
+                      style={{ ...S.select, background: 'var(--background)', maxWidth: '200px' }}
+                      value={topN}
+                      onChange={e => setTopN(Number(e.target.value))}
+                    >
+                      <option value={5}>5</option>
+                      <option value={10}>10</option>
+                      <option value={20}>20</option>
+                      <option value={50}>50</option>
+                      <option value={100}>100</option>
+                    </select>
+                  </div>
+
+                  <div style={{ borderTop: '1px solid var(--border)', paddingTop: '1rem', marginTop: '1rem' }}>
+                    <h3 style={{ margin: '0 0 0.75rem 0', fontSize: '1rem', fontWeight: '600' }}>Current Configuration</h3>
+                    <div style={{ background: 'var(--muted)', borderRadius: 'var(--radius)', padding: '0.75rem', fontFamily: 'var(--font-mono)', fontSize: '0.75rem' }}>
+                      <div style={{ marginBottom: '0.5rem' }}>
+                        <span style={{ color: 'var(--muted-foreground)' }}>Top N Signals:</span>{' '}
+                        <span style={{ color: 'var(--foreground)', fontWeight: '600' }}>{topN}</span>
+                      </div>
+                      <div style={{ marginBottom: '0.5rem' }}>
+                        <span style={{ color: 'var(--muted-foreground)' }}>Default Universe:</span>{' '}
+                        <span style={{ color: 'var(--foreground)', fontWeight: '600' }}>{universe}</span>
+                      </div>
+                      <div>
+                        <span style={{ color: 'var(--muted-foreground)' }}>Backend Status:</span>{' '}
+                        <span style={{ color: connected ? '#22c55e' : 'var(--destructive)', fontWeight: '600' }}>
+                          {connected ? 'Connected' : 'Disconnected'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// Model Card Component with Parameter Customization
+function ModelCard({ model, result, running, onRun, onPDF, onEnhancedPDF, onRunWithParams }: {
+  model: Model;
+  result?: ModelResult;
+  running: boolean;
+  onRun: () => void;
+  onPDF: (id: string) => void;
+  onEnhancedPDF: (modelId: string) => void;
+  onRunWithParams?: (params: Record<string, any>) => void;
+}) {
+  const [showParams, setShowParams] = useState(false);
+  const [customParams, setCustomParams] = useState<Record<string, any>>(model.default_parameters || {});
+
+  const handleParamChange = (key: string, value: any) => {
+    setCustomParams(prev => ({ ...prev, [key]: value }));
+  };
+
+  const runWithCustomParams = () => {
+    if (onRunWithParams) {
+      onRunWithParams(customParams);
+    }
+    setShowParams(false);
+  };
+
+  const getCategoryColor = () => {
+    if (model.category === 'Technical') return { bg: 'var(--accent)', color: 'var(--accent-foreground)' };
+    if (model.category === 'Quantitative') return { bg: '#8b5cf6', color: 'white' };
+    return { bg: 'var(--muted)', color: 'var(--muted-foreground)' };
+  };
+
+  const catStyle = getCategoryColor();
+
+  return (
+    <div style={S.card}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div>
+          <h3 style={{ margin: 0, fontFamily: 'var(--font-sans)', fontWeight: '700' }}>{model.name}</h3>
+          <span style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '0', background: catStyle.bg, color: catStyle.color, border: '2px solid var(--border)', fontWeight: '700', textTransform: 'uppercase' as const, display: 'inline-block', marginTop: '6px' }}>{model.category}</span>
+        </div>
+        <div style={{ display: 'flex', gap: '5px' }}>
+          <button style={{ ...S.btn('secondary'), fontSize: '11px', padding: '4px 8px' }} onClick={() => setShowParams(!showParams)} title="Customize Parameters">⚙️</button>
+          <button style={{ ...S.btn('primary'), opacity: running ? 0.6 : 1 }} onClick={onRun} disabled={running}>{running ? '⏳...' : '▶ Run'}</button>
+        </div>
+      </div>
+      <p style={{ color: 'var(--muted-foreground)', fontSize: '12px', margin: '10px 0' }}>{model.description}</p>
+
+      {/* Parameter Customization Panel */}
+      {showParams && model.default_parameters && (
+        <div style={{ background: 'var(--muted)', padding: '16px', borderRadius: '0', marginBottom: '12px', border: '3px solid var(--border)', boxShadow: '4px 4px 0 var(--border)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', borderBottom: '2px solid var(--border)', paddingBottom: '10px' }}>
+            <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '700', fontFamily: 'var(--font-sans)', textTransform: 'uppercase' as const }}>⚙️ Custom Parameters</h4>
+            <button style={{ background: 'var(--card)', border: '2px solid var(--border)', cursor: 'pointer', fontSize: '14px', padding: '4px 8px', fontWeight: '700', boxShadow: '2px 2px 0 var(--border)' }} onClick={() => setShowParams(false)}>✕</button>
+          </div>
+          <div style={{ display: 'grid', gap: '8px' }}>
+            {Object.entries(model.default_parameters).map(([key, defaultValue]) => (
+              <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <label style={{ fontSize: '11px', minWidth: '120px', color: 'var(--foreground)' }}>{key.replace(/_/g, ' ')}</label>
+                {typeof defaultValue === 'boolean' ? (
+                  <input
+                    type="checkbox"
+                    checked={customParams[key] ?? defaultValue}
+                    onChange={(e) => handleParamChange(key, e.target.checked)}
+                  />
+                ) : typeof defaultValue === 'number' ? (
+                  <input
+                    type="number"
+                    style={{ ...S.input, width: '80px', marginBottom: 0, padding: '4px 8px' }}
+                    value={customParams[key] ?? defaultValue}
+                    onChange={(e) => handleParamChange(key, parseFloat(e.target.value) || 0)}
+                    step={defaultValue < 1 ? 0.1 : 1}
+                  />
+                ) : (
+                  <input
+                    type="text"
+                    style={{ ...S.input, width: '100px', marginBottom: 0, padding: '4px 8px' }}
+                    value={customParams[key] ?? defaultValue}
+                    onChange={(e) => handleParamChange(key, e.target.value)}
+                  />
+                )}
+              </div>
+            ))}
+          </div>
+          <div style={{ marginTop: '10px', display: 'flex', gap: '8px' }}>
+            <button style={{ ...S.btn('success'), fontSize: '11px', padding: '6px 12px' }} onClick={runWithCustomParams} disabled={running}>
+              {running ? '⏳...' : '▶ Run with Custom'}
+            </button>
+            <button style={{ ...S.btn('secondary'), fontSize: '11px', padding: '6px 12px' }} onClick={() => setCustomParams(model.default_parameters || {})}>
+              Reset
+            </button>
+          </div>
+        </div>
+      )}
+
+      {result && (
+        <div style={{ borderTop: '1px solid var(--border)', paddingTop: '10px' }}>
+          <div style={{ display: 'flex', gap: '10px', marginBottom: '8px', fontSize: '12px', flexWrap: 'wrap' }}>
+            <span style={{ color: '#22c55e' }}>✅ {result.buy_signals.length} Buy</span>
+            <span style={{ color: 'var(--destructive)' }}>🔻 {result.sell_signals.length} Sell</span>
+            <span style={{ color: 'var(--muted-foreground)' }}>{result.stocks_with_data}/{result.total_stocks_analyzed} stocks</span>
+            <span style={{ color: 'var(--muted-foreground)', fontSize: '11px', fontStyle: 'italic' }}>(Top signals shown)</span>
+          </div>
+          {result.buy_signals.slice(0, 4).map((s, i) => (
+            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', padding: '3px 0' }}>
+              <b>{s.ticker.replace('.BK', '')}</b><span>${s.price_at_signal.toFixed(2)}</span><span style={{ color: '#22c55e' }}>{s.score.toFixed(0)}</span>
+            </div>
+          ))}
+          <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+            <button style={{ ...S.btn('secondary'), fontSize: '11px' }} onClick={() => onPDF(result.run_id)}>📄 PDF</button>
+            <button style={{ ...S.btn('primary'), fontSize: '11px' }} onClick={() => onEnhancedPDF(model.id)}>📊 Enhanced PDF</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
