@@ -44,5 +44,12 @@ quantstats>=0.0.62  # Performance reports and tearsheets
 plotly>=5.18.0
 kaleido>=0.2.1  # For static image export from Plotly
 
+# Testing
+pytest>=7.4.0
+pytest-asyncio>=0.23.0
+pytest-cov>=4.1.0
+httpx>=0.26.0  # Already listed above, used for async testing
+
 # Note: Run with Python 3.10+ for best compatibility
+
 
