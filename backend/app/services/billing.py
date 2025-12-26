@@ -53,6 +53,29 @@ class StripeService:
         except Exception as e:
             logger.error(f"Stripe error: {str(e)}")
             return None
+
+    async def create_portal_session(self, user_email: str, return_url: str) -> Optional[str]:
+        """Create a billing portal session for existing customers"""
+        if not self.api_key:
+            return None
+            
+        try:
+            # Find customer by email
+            customers = stripe.Customer.list(email=user_email, limit=1)
+            if not customers.data:
+                return None
+                
+            customer_id = customers.data[0].id
+            
+            portal_session = stripe.billing_portal.Session.create(
+                customer=customer_id,
+                return_url=return_url,
+            )
+            return portal_session.url
+            
+        except Exception as e:
+            logger.error(f"Stripe portal error: {str(e)}")
+            return None
             
 _billing_service = None
 

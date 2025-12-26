@@ -34,3 +34,25 @@ async def create_checkout_link(
         raise HTTPException(status_code=500, detail="Failed to create checkout link")
         
     return {"url": url}
+
+class PortalRequest(BaseModel):
+    user_email: str
+    return_url: str
+
+@router.post("/portal")
+async def create_portal_link(
+    req: PortalRequest,
+    user_id: str = Depends(require_user_id)
+):
+    """Generate a Stripe Customer Portal link"""
+    billing = get_billing_service()
+    
+    url = await billing.create_portal_session(
+        user_email=req.user_email,
+        return_url=req.return_url
+    )
+    
+    if not url:
+        raise HTTPException(status_code=404, detail="Customer not found or failed to create portal")
+        
+    return {"url": url}
