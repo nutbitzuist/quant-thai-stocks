@@ -26,6 +26,19 @@ async def lifespan(app: FastAPI):
     logger.info("🚀 Starting Quant Stock Analysis API")
     logger.info(f"   Debug mode: {settings.debug}")
     logger.info(f"   Default universe: {settings.default_universe}")
+    
+    # Initialize database
+    try:
+        from app.database import init_db, check_db_connection
+        await init_db()
+        db_connected = await check_db_connection()
+        if db_connected:
+            logger.info("   ✅ Database: Connected to PostgreSQL")
+        else:
+            logger.warning("   ⚠️ Database: Not configured (using in-memory)")
+    except Exception as e:
+        logger.warning(f"   ⚠️ Database: Failed to initialize - {e}")
+    
     logger.info("=" * 50)
     yield
     logger.info("Shutting down API")
